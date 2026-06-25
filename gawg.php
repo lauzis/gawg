@@ -15,7 +15,10 @@ define( 'GAWG_VERSION',    '1.0.0' );
 define( 'GAWG_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GAWG_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-giveaway.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg.php';
+
+add_action( 'plugins_loaded', array( 'GAWG', 'init' ) );
 
 register_activation_hook( __FILE__, 'gawg_activate' );
 register_deactivation_hook( __FILE__, 'gawg_deactivate' );
