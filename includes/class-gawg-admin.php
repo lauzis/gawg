@@ -30,6 +30,14 @@ class GAWG_Admin {
 			'gawg',
 			array( __CLASS__, 'render_self_tests_page' )
 		);
+		add_submenu_page(
+			'gawg',
+			__( 'Help', 'gawg' ),
+			__( 'Help', 'gawg' ),
+			'manage_options',
+			'gawg-help',
+			array( __CLASS__, 'render_help_page' )
+		);
 	}
 
 	public static function render_self_tests_page() {
@@ -155,6 +163,52 @@ class GAWG_Admin {
 		}
 
 		wp_send_json_success( $results );
+	}
+
+	public static function render_help_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'gawg' ) );
+		}
+		$new_giveaway_url  = admin_url( 'post-new.php?post_type=' . GAWG_Giveaway::POST_TYPE );
+		$all_giveaways_url = admin_url( 'edit.php?post_type=' . GAWG_Giveaway::POST_TYPE );
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'GAWG Help', 'gawg' ); ?></h1>
+
+			<h2><?php esc_html_e( 'Creating a Giveaway', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'To run a giveaway, start by creating a new Giveaway entry. Each giveaway gets a unique reference UUID that you can share with participants or embed in entry forms.', 'gawg' ); ?>
+			</p>
+			<ol>
+				<li>
+					<?php
+					printf(
+						/* translators: %s: link to the Add New Giveaway screen */
+						wp_kses(
+							__( 'Go to <a href="%s">Add New Giveaway</a> and give your giveaway a descriptive title.', 'gawg' ),
+							array( 'a' => array( 'href' => array() ) )
+						),
+						esc_url( $new_giveaway_url )
+					);
+					?>
+				</li>
+				<li><?php esc_html_e( 'Click Publish. A unique UUID is automatically assigned and shown in the Reference UUID box on the right.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'Share the UUID or the entry link with your audience so they can participate.', 'gawg' ); ?></li>
+			</ol>
+			<p>
+				<?php
+				printf(
+					/* translators: %s: link to the Giveaways list screen */
+					wp_kses(
+						__( 'You can view and manage all your giveaways on the <a href="%s">Giveaways list</a> screen.', 'gawg' ),
+						array( 'a' => array( 'href' => array() ) )
+					),
+					esc_url( $all_giveaways_url )
+				);
+				?>
+			</p>
+		</div>
+		<?php
 	}
 
 	private static function test_create_giveaway_has_uuid() {
