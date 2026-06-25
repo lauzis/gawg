@@ -4,7 +4,8 @@ defined( 'ABSPATH' ) || exit;
 class GAWG_Admin {
 
 	private static $tests = array(
-		'create_giveaway_has_uuid' => 'Create Giveaway Has UUID',
+		'create_participant_has_uuid'    => 'Create Participant Has UUID',
+		'create_giveaway_term_has_uuid'  => 'Create Giveaway Term Has UUID',
 	);
 
 	public static function init() {
@@ -21,6 +22,27 @@ class GAWG_Admin {
 			array( __CLASS__, 'render_self_tests_page' ),
 			'dashicons-awards',
 			25
+		);
+		add_submenu_page(
+			'gawg',
+			__( 'Participants', 'gawg' ),
+			__( 'Participants', 'gawg' ),
+			'manage_options',
+			'edit.php?post_type=' . GAWG_Participant::POST_TYPE
+		);
+		add_submenu_page(
+			'gawg',
+			__( 'Add New Participant', 'gawg' ),
+			__( 'Add New', 'gawg' ),
+			'manage_options',
+			'post-new.php?post_type=' . GAWG_Participant::POST_TYPE
+		);
+		add_submenu_page(
+			'gawg',
+			__( 'Giveaways', 'gawg' ),
+			__( 'Giveaways', 'gawg' ),
+			'manage_options',
+			'edit-tags.php?taxonomy=' . GAWG_Giveaway::TAXONOMY . '&post_type=' . GAWG_Participant::POST_TYPE
 		);
 		add_submenu_page(
 			'gawg',
@@ -156,8 +178,11 @@ class GAWG_Admin {
 				continue;
 			}
 			switch ( $test_id ) {
-				case 'create_giveaway_has_uuid':
-					$results[] = self::test_create_giveaway_has_uuid();
+				case 'create_participant_has_uuid':
+					$results[] = self::test_create_participant_has_uuid();
+					break;
+				case 'create_giveaway_term_has_uuid':
+					$results[] = self::test_create_giveaway_term_has_uuid();
 					break;
 			}
 		}
@@ -169,41 +194,63 @@ class GAWG_Admin {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'Unauthorized.', 'gawg' ) );
 		}
-		$new_giveaway_url  = admin_url( 'post-new.php?post_type=' . GAWG_Giveaway::POST_TYPE );
-		$all_giveaways_url = admin_url( 'edit.php?post_type=' . GAWG_Giveaway::POST_TYPE );
+		$new_participant_url   = admin_url( 'post-new.php?post_type=' . GAWG_Participant::POST_TYPE );
+		$all_participants_url  = admin_url( 'edit.php?post_type=' . GAWG_Participant::POST_TYPE );
+		$new_giveaway_url      = admin_url( 'edit-tags.php?taxonomy=' . GAWG_Giveaway::TAXONOMY . '&post_type=' . GAWG_Participant::POST_TYPE );
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'GAWG Help', 'gawg' ); ?></h1>
 
 			<h2><?php esc_html_e( 'Creating a Giveaway', 'gawg' ); ?></h2>
 			<p>
-				<?php esc_html_e( 'To run a giveaway, start by creating a new Giveaway entry. Each giveaway gets a unique reference UUID that you can share with participants or embed in entry forms.', 'gawg' ); ?>
+				<?php esc_html_e( 'Each giveaway is a taxonomy term. Create a giveaway first to obtain its unique reference UUID, then add participants and assign them to that giveaway.', 'gawg' ); ?>
 			</p>
 			<ol>
 				<li>
 					<?php
 					printf(
-						/* translators: %s: link to the Add New Giveaway screen */
+						/* translators: %s: link to the Giveaways taxonomy screen */
 						wp_kses(
-							__( 'Go to <a href="%s">Add New Giveaway</a> and give your giveaway a descriptive title.', 'gawg' ),
+							__( 'Go to <a href="%s">Giveaways</a> and add a new giveaway with a descriptive name.', 'gawg' ),
 							array( 'a' => array( 'href' => array() ) )
 						),
 						esc_url( $new_giveaway_url )
 					);
 					?>
 				</li>
-				<li><?php esc_html_e( 'Click Publish. A unique UUID is automatically assigned and shown in the Reference UUID box on the right.', 'gawg' ); ?></li>
-				<li><?php esc_html_e( 'Share the UUID or the entry link with your audience so they can participate.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'Click Add New Giveaway. A unique UUID is automatically assigned and shown in the Reference UUID field when you next edit the term.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'Share the UUID or an entry link with your audience so they can participate.', 'gawg' ); ?></li>
+			</ol>
+
+			<h2><?php esc_html_e( 'Adding Participants', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'Participants are posts that belong to one or more giveaways via the Giveaway taxonomy. Each participant also receives a unique reference UUID.', 'gawg' ); ?>
+			</p>
+			<ol>
+				<li>
+					<?php
+					printf(
+						/* translators: %s: link to the Add New Participant screen */
+						wp_kses(
+							__( 'Go to <a href="%s">Add New Participant</a> and enter the participant\'s name as the title.', 'gawg' ),
+							array( 'a' => array( 'href' => array() ) )
+						),
+						esc_url( $new_participant_url )
+					);
+					?>
+				</li>
+				<li><?php esc_html_e( 'Assign the participant to one or more giveaways using the Giveaway panel on the right.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'Click Publish. A unique UUID is generated automatically and shown in the Reference UUID box.', 'gawg' ); ?></li>
 			</ol>
 			<p>
 				<?php
 				printf(
-					/* translators: %s: link to the Giveaways list screen */
+					/* translators: %s: link to the Participants list screen */
 					wp_kses(
-						__( 'You can view and manage all your giveaways on the <a href="%s">Giveaways list</a> screen.', 'gawg' ),
+						__( 'You can view and manage all participants on the <a href="%s">Participants list</a> screen.', 'gawg' ),
 						array( 'a' => array( 'href' => array() ) )
 					),
-					esc_url( $all_giveaways_url )
+					esc_url( $all_participants_url )
 				);
 				?>
 			</p>
@@ -211,10 +258,10 @@ class GAWG_Admin {
 		<?php
 	}
 
-	private static function test_create_giveaway_has_uuid() {
+	private static function test_create_participant_has_uuid() {
 		$result = array(
-			'id'      => 'create_giveaway_has_uuid',
-			'name'    => 'Create Giveaway Has UUID',
+			'id'      => 'create_participant_has_uuid',
+			'name'    => 'Create Participant Has UUID',
 			'pass'    => false,
 			'message' => '',
 		);
@@ -222,7 +269,7 @@ class GAWG_Admin {
 		$post_id = wp_insert_post(
 			array(
 				'post_title'  => 'GAWG Self Test – ' . gmdate( 'Y-m-d H:i:s' ),
-				'post_type'   => GAWG_Giveaway::POST_TYPE,
+				'post_type'   => GAWG_Participant::POST_TYPE,
 				'post_status' => 'publish',
 			),
 			true
@@ -233,7 +280,7 @@ class GAWG_Admin {
 			return $result;
 		}
 
-		$uuid = get_post_meta( $post_id, GAWG_Giveaway::META_UUID, true );
+		$uuid = get_post_meta( $post_id, GAWG_Participant::META_UUID, true );
 
 		wp_delete_post( $post_id, true );
 
@@ -249,6 +296,39 @@ class GAWG_Admin {
 
 		$result['pass']    = true;
 		$result['message'] = 'UUID: ' . $uuid . ' — Post deleted successfully.';
+		return $result;
+	}
+
+	private static function test_create_giveaway_term_has_uuid() {
+		$result = array(
+			'id'      => 'create_giveaway_term_has_uuid',
+			'name'    => 'Create Giveaway Term Has UUID',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$term = wp_insert_term(
+			'GAWG Self Test – ' . gmdate( 'Y-m-d H:i:s' ),
+			GAWG_Giveaway::TAXONOMY
+		);
+
+		if ( is_wp_error( $term ) ) {
+			$result['message'] = 'Failed to insert term: ' . $term->get_error_message();
+			return $result;
+		}
+
+		$term_id = $term['term_id'];
+		$uuid    = get_term_meta( $term_id, GAWG_Giveaway::META_UUID, true );
+
+		wp_delete_term( $term_id, GAWG_Giveaway::TAXONOMY );
+
+		if ( '' === $uuid ) {
+			$result['message'] = 'UUID meta was empty after saving.';
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'UUID: ' . $uuid . ' — Term deleted successfully.';
 		return $result;
 	}
 }
