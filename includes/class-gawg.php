@@ -8,5 +8,6 @@ class GAWG {
 		GAWG_Giveaway::init();
 		GAWG_Admin::init();
 		GAWG_Form::init();
+		GAWG_Block::init();
 	}
 }
