@@ -254,6 +254,23 @@ class GAWG_Admin {
 				);
 				?>
 			</p>
+
+			<h2><?php esc_html_e( 'Embedding the Entry Form', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'Use the [gawg_form] shortcode to embed an AJAX entry form on any page or post. The form collects an email address, optionally requires the visitor to accept the giveaway rules, and saves a new participant automatically.', 'gawg' ); ?>
+			</p>
+			<p><?php esc_html_e( 'Basic usage (copy the giveaway UUID from the Reference UUID field on its edit screen):', 'gawg' ); ?></p>
+			<pre><code>[gawg_form uuid="your-giveaway-uuid"]</code></pre>
+			<p><?php esc_html_e( 'With a rules link and a custom success message:', 'gawg' ); ?></p>
+			<pre><code>[gawg_form uuid="your-giveaway-uuid" rules_url="https://example.com/rules" success_message="&lt;p&gt;You&#39;re in!&lt;/p&gt;"]</code></pre>
+			<p><?php esc_html_e( 'Shortcode attributes:', 'gawg' ); ?></p>
+			<ul>
+				<li><strong>uuid</strong> — <?php esc_html_e( '(required) The Reference UUID of the giveaway term.', 'gawg' ); ?></li>
+				<li><strong>rules_url</strong> — <?php esc_html_e( '(optional) Full URL to the giveaway rules page. When provided, a required checkbox is shown.', 'gawg' ); ?></li>
+				<li><strong>rules_post_id</strong> — <?php esc_html_e( '(optional) Post ID of a rules page — an alternative to rules_url.', 'gawg' ); ?></li>
+				<li><strong>success_message</strong> — <?php esc_html_e( '(optional) HTML shown after a successful submission. Defaults to a translatable thank-you message.', 'gawg' ); ?></li>
+			</ul>
+			<p><?php esc_html_e( 'If the same email address is submitted for the same giveaway more than once, the form displays "You are already in the list of participants" and no duplicate entry is created.', 'gawg' ); ?></p>
 		</div>
 		<?php
 	}
