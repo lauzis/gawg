@@ -15,6 +15,7 @@ define( 'GAWG_VERSION',    '1.0.0' );
 define( 'GAWG_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GAWG_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-participant.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-giveaway.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-admin.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg.php';
