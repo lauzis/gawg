@@ -257,8 +257,20 @@ class GAWG_Admin {
 
 			<h2><?php esc_html_e( 'Embedding the Entry Form', 'gawg' ); ?></h2>
 			<p>
-				<?php esc_html_e( 'Use the [gawg_form] shortcode to embed an AJAX entry form on any page or post. The form collects an email address, optionally requires the visitor to accept the giveaway rules, and saves a new participant automatically.', 'gawg' ); ?>
+				<?php esc_html_e( 'The entry form can be inserted into any page or post using either the Giveaway Form block or the [gawg_form] shortcode. Both methods produce identical output — changing the shortcode output changes both automatically.', 'gawg' ); ?>
 			</p>
+
+			<h3><?php esc_html_e( 'Gutenberg Block', 'gawg' ); ?></h3>
+			<p>
+				<?php esc_html_e( 'Search for "Giveaway Form" in the block inserter and add it to your page. In the block settings panel (Inspector Controls) on the right:', 'gawg' ); ?>
+			</p>
+			<ul>
+				<li><strong><?php esc_html_e( 'Giveaway', 'gawg' ); ?></strong> — <?php esc_html_e( 'Choose the giveaway campaign from the dropdown. Only giveaways with a Reference UUID are listed.', 'gawg' ); ?></li>
+				<li><strong><?php esc_html_e( 'Rules URL', 'gawg' ); ?></strong> — <?php esc_html_e( '(optional) Enter the URL to the giveaway rules page. When set, a required acceptance checkbox is shown in the form.', 'gawg' ); ?></li>
+			</ul>
+			<p><?php esc_html_e( 'The editor canvas shows a live preview of the form as it will appear to visitors.', 'gawg' ); ?></p>
+
+			<h3><?php esc_html_e( 'Shortcode', 'gawg' ); ?></h3>
 			<p><?php esc_html_e( 'Basic usage (copy the giveaway UUID from the Reference UUID field on its edit screen):', 'gawg' ); ?></p>
 			<pre><code>[gawg_form uuid="your-giveaway-uuid"]</code></pre>
 			<p><?php esc_html_e( 'With a rules link and a custom success message:', 'gawg' ); ?></p>

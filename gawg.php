@@ -19,6 +19,7 @@ require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-participant.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-giveaway.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-admin.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-form.php';
+require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-block.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg.php';
 
 add_action( 'plugins_loaded', array( 'GAWG', 'init' ) );

@@ -12,6 +12,7 @@ It could be useful for anyone running small giveaways on a WordPress site withou
 - **Participant post type** — each participant is a WordPress post (`gawg_participant`) with a title and its own unique reference UUID for external identification.
 - **Auto-generated UUIDs** — a v4 UUID is created automatically for both giveaway terms (on save) and participant posts (on publish), displayed in edit screens for easy copying.
 - **`[gawg_form]` shortcode** — embeds an AJAX entry form on any page or post; collects an email address, optionally links to the giveaway rules (via `rules_url` or `rules_post_id`), prevents duplicate entries per giveaway, and displays a configurable HTML success message (`success_message`).
+- **`gawg/form` Gutenberg block** — a dynamic block that wraps the `[gawg_form]` shortcode; configure the giveaway and rules URL from the block's Inspector Controls panel and see a live server-side preview in the editor.
 - **Admin UI** — a dedicated GAWG menu in the WordPress admin with:
   - **Participants** — list and manage all participant posts.
   - **Giveaways** — list and manage all giveaway taxonomy terms.
@@ -29,18 +30,19 @@ It could be useful for anyone running small giveaways on a WordPress site withou
 
 ## Usage
 1. Go to **GAWG → Giveaways** and click **Add New Giveaway**. Give the giveaway a name and save it. A unique UUID is automatically assigned and shown in the **Reference UUID** field when you edit the term.
-2. Embed the entry form on any page using the shortcode:
+2. Embed the entry form using the **Giveaway Form** block (search for it in the block inserter) or via the shortcode:
    ```
    [gawg_form uuid="<giveaway-uuid>" rules_url="https://example.com/rules"]
    ```
-   Optional attributes:
+   With the block, select the giveaway and rules URL in the Inspector Controls panel; the editor shows a live preview of the form.
+   Optional shortcode attributes:
    - `rules_post_id` — post ID of a rules page (alternative to `rules_url`).
    - `success_message` — custom HTML shown after a successful submission (default: a translatable thank-you message).
 3. Visitors submit the form with their email address. Duplicate entries for the same giveaway are rejected with an inline message.
 4. Go to **GAWG → Participants** to view all entries, filtered by giveaway if needed.
 
 ## Current State
-The plugin is in early development (v1.0.0). Giveaways are modelled as a custom taxonomy and participants as a custom post type, both with auto-generated reference UUIDs. The `[gawg_form]` shortcode enables front-end AJAX entry collection. Winner-drawing functionality is planned for a future release.
+The plugin is in early development (v1.0.0). Giveaways are modelled as a custom taxonomy and participants as a custom post type, both with auto-generated reference UUIDs. The `[gawg_form]` shortcode and the `gawg/form` Gutenberg block both enable front-end AJAX entry collection; both share the same rendering code so changes to the shortcode output apply to both automatically. Winner-drawing functionality is planned for a future release.
 
 ## Development
 This project is maintained with the assistance of [Claude Code](https://claude.ai/code) and [CodeRabbit](https://coderabbit.ai).
