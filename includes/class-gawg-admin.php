@@ -312,9 +312,24 @@ class GAWG_Admin {
 				<?php esc_html_e( 'The Settings page (GAWG → Settings) contains plugin-wide configuration options.', 'gawg' ); ?>
 			</p>
 
+			<h3><?php esc_html_e( 'Spam Protection', 'gawg' ); ?></h3>
+			<p>
+				<?php esc_html_e( 'The entry form includes two layers of spam protection that work together:', 'gawg' ); ?>
+			</p>
+			<ul>
+				<li>
+					<strong><?php esc_html_e( 'Honeypot', 'gawg' ); ?></strong> —
+					<?php esc_html_e( 'A hidden field is included in the form that is invisible to real users. Automated bots that fill in all fields will populate it, and the server silently rejects those submissions. This protection is always active and requires no configuration.', 'gawg' ); ?>
+				</li>
+				<li>
+					<strong><?php esc_html_e( 'Google reCAPTCHA v2 (optional)', 'gawg' ); ?></strong> —
+					<?php esc_html_e( 'When both a Site Key and a Secret Key are saved on the Settings page, an "I\'m not a robot" checkbox widget is automatically rendered inside the form and the response is verified server-side before the entry is accepted. When no keys are configured, reCAPTCHA is skipped entirely — the form works normally without it.', 'gawg' ); ?>
+				</li>
+			</ul>
+
 			<h3><?php esc_html_e( 'Google reCAPTCHA v2', 'gawg' ); ?></h3>
 			<p>
-				<?php esc_html_e( 'To protect the entry form from spam, you can enable Google reCAPTCHA v2 (checkbox). When configured, a "I\'m not a robot" checkbox is rendered inside the form and submission is blocked until the challenge is solved.', 'gawg' ); ?>
+				<?php esc_html_e( 'To enable reCAPTCHA, follow these steps:', 'gawg' ); ?>
 			</p>
 			<ol>
 				<li>
@@ -342,7 +357,7 @@ class GAWG_Admin {
 					);
 					?>
 				</li>
-				<li><?php esc_html_e( 'The reCAPTCHA widget will now appear automatically in every [gawg_form] or Giveaway Form block on your site.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'The reCAPTCHA widget will now appear automatically in every [gawg_form] or Giveaway Form block on your site. Remove either key to disable reCAPTCHA at any time without affecting the honeypot.', 'gawg' ); ?></li>
 			</ol>
 		</div>
 		<?php
