@@ -62,6 +62,25 @@
 					if ( response.success ) {
 						form.style.display    = 'none';
 						success.style.display = '';
+						if ( response.data && response.data.invite_url ) {
+							var shareWrap  = document.createElement( 'div' );
+							shareWrap.className = 'gawg-invite-wrap';
+							var inviteInput = document.createElement( 'input' );
+							inviteInput.type     = 'text';
+							inviteInput.readOnly = true;
+							inviteInput.value    = response.data.invite_url;
+							inviteInput.style    = 'width:100%;font-family:monospace;';
+							inviteInput.addEventListener( 'click', function () { inviteInput.select(); } );
+							var heading = document.createElement( 'p' );
+							heading.innerHTML = '<strong>' + gawgFormConfig.i18n.inviteHeading + '</strong>';
+							var desc = document.createElement( 'p' );
+							desc.className   = 'description';
+							desc.textContent = gawgFormConfig.i18n.inviteDesc;
+							shareWrap.appendChild( heading );
+							shareWrap.appendChild( inviteInput );
+							shareWrap.appendChild( desc );
+							success.appendChild( shareWrap );
+						}
 					} else {
 						var msg = response.data && response.data.message
 							? response.data.message

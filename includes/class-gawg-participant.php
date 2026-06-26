@@ -3,14 +3,19 @@ defined( 'ABSPATH' ) || exit;
 
 class GAWG_Participant {
 
-	const POST_TYPE = 'gawg_participant';
-	const META_UUID = '_gawg_uuid';
+	const POST_TYPE           = 'gawg_participant';
+	const META_UUID           = '_gawg_uuid';
+	const META_ENTRIES_PREFIX = 'gawg_entries_';
+	const META_VISIT_PREFIX   = 'gawg_visit_';
 
 	public static function init() {
 		add_action( 'init',       array( __CLASS__, 'register_post_type' ) );
 		add_action( 'init',       array( __CLASS__, 'register_meta' ) );
 		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'maybe_generate_uuid' ), 10, 2 );
 		add_action( 'add_meta_boxes', array( __CLASS__, 'add_uuid_meta_box' ) );
+		add_action( 'add_meta_boxes', array( __CLASS__, 'add_entries_meta_box' ) );
+		add_filter( 'manage_' . self::POST_TYPE . '_posts_columns',       array( __CLASS__, 'add_entries_column' ) );
+		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( __CLASS__, 'render_entries_column' ), 10, 2 );
 	}
 
 	public static function register_post_type() {
@@ -109,5 +114,70 @@ class GAWG_Participant {
 		</p>
 		<p class="description"><?php esc_html_e( 'Use this UUID in subscription forms or external links to reference this participant.', 'gawg' ); ?></p>
 		<?php
+	}
+
+	public static function add_entries_meta_box() {
+		add_meta_box(
+			'gawg_participant_entries',
+			__( 'Entries & Invite Links', 'gawg' ),
+			array( __CLASS__, 'render_entries_meta_box' ),
+			self::POST_TYPE,
+			'side',
+			'default'
+		);
+	}
+
+	public static function render_entries_meta_box( $post ) {
+		$participant_uuid = get_post_meta( $post->ID, self::META_UUID, true );
+		$terms            = wp_get_object_terms( $post->ID, GAWG_Giveaway::TAXONOMY );
+
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			echo '<p>' . esc_html__( 'No giveaway assigned yet.', 'gawg' ) . '</p>';
+			return;
+		}
+
+		foreach ( $terms as $term ) {
+			$giveaway_uuid = get_term_meta( $term->term_id, GAWG_Giveaway::META_UUID, true );
+			$count         = '' !== $giveaway_uuid ? (int) get_post_meta( $post->ID, self::META_ENTRIES_PREFIX . $giveaway_uuid, true ) : 0;
+			if ( $count < 1 ) {
+				$count = 1;
+			}
+			echo '<p><strong>' . esc_html( $term->name ) . '</strong><br>';
+			echo esc_html__( 'Entries:', 'gawg' ) . ' <strong>' . esc_html( (string) $count ) . '</strong></p>';
+
+			if ( '' !== $giveaway_uuid && '' !== $participant_uuid ) {
+				$invite_url = GAWG_Form::build_invite_url( $giveaway_uuid, $participant_uuid );
+				echo '<p>' . esc_html__( 'Invite link:', 'gawg' ) . '<br>';
+				echo '<input type="text" readonly value="' . esc_attr( $invite_url ) . '" style="width:100%;font-family:monospace;font-size:11px;" onclick="this.select();"></p>';
+			}
+		}
+	}
+
+	public static function add_entries_column( $columns ) {
+		$columns['gawg_entries'] = __( 'Entries', 'gawg' );
+		return $columns;
+	}
+
+	public static function render_entries_column( $column, $post_id ) {
+		if ( 'gawg_entries' !== $column ) {
+			return;
+		}
+
+		$terms = wp_get_object_terms( $post_id, GAWG_Giveaway::TAXONOMY );
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			echo '—';
+			return;
+		}
+
+		$parts = array();
+		foreach ( $terms as $term ) {
+			$giveaway_uuid = get_term_meta( $term->term_id, GAWG_Giveaway::META_UUID, true );
+			$count         = '' !== $giveaway_uuid ? (int) get_post_meta( $post_id, self::META_ENTRIES_PREFIX . $giveaway_uuid, true ) : 0;
+			if ( $count < 1 ) {
+				$count = 1;
+			}
+			$parts[] = esc_html( $term->name ) . ': ' . $count;
+		}
+		echo implode( '<br>', $parts ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 }

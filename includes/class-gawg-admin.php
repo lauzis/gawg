@@ -10,6 +10,10 @@ class GAWG_Admin {
 		'create_giveaway_term_has_uuid'       => 'Create Giveaway Term Has UUID',
 		'link_participant_single_giveaway'    => 'Participant Linked to Single Giveaway',
 		'link_participant_multiple_giveaways' => 'Participant Linked to Multiple Giveaways',
+		'entries_default_one'                 => 'Entries Default to 1 After Form Submit',
+		'invite_url_format'                   => 'Invite URL Contains Correct Query Params',
+		'new_ip_increments_entries'           => 'New IP Increments Entry Count',
+		'duplicate_ip_no_increment'           => 'Duplicate IP Does Not Double-Increment Entries',
 	);
 
 	public static function init() {
@@ -407,6 +411,18 @@ class GAWG_Admin {
 				case 'link_participant_multiple_giveaways':
 					$results[] = self::test_link_participant_multiple_giveaways();
 					break;
+				case 'entries_default_one':
+					$results[] = self::test_entries_default_one();
+					break;
+				case 'invite_url_format':
+					$results[] = self::test_invite_url_format();
+					break;
+				case 'new_ip_increments_entries':
+					$results[] = self::test_new_ip_increments_entries();
+					break;
+				case 'duplicate_ip_no_increment':
+					$results[] = self::test_duplicate_ip_no_increment();
+					break;
 			}
 		}
 
@@ -595,6 +611,33 @@ class GAWG_Admin {
 				</li>
 				<li><?php esc_html_e( 'The reCAPTCHA widget will now appear automatically in every [gawg_form] or Giveaway Form block on your site. Remove either key to disable reCAPTCHA at any time without affecting the honeypot.', 'gawg' ); ?></li>
 			</ol>
+
+			<h2><?php esc_html_e( 'Extra Entries via Invite Links', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'Each participant can earn bonus entries by sharing their personal invite link. When a unique visitor clicks the link, the inviting participant\'s entry count for that giveaway increases by 1.', 'gawg' ); ?>
+			</p>
+			<h3><?php esc_html_e( 'How it works', 'gawg' ); ?></h3>
+			<ol>
+				<li><?php esc_html_e( 'After submitting the entry form, a participant receives their personal invite link in the success message.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'The participant shares the link with friends. Each click from a unique IP address increments their entry count by 1.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'The same IP address can only count once per invite link, so refreshing the page or multiple clicks from one location do not award extra entries.', 'gawg' ); ?></li>
+			</ol>
+			<h3><?php esc_html_e( 'Invite link format', 'gawg' ); ?></h3>
+			<pre><code>/?gwag-giveaway={giveaway-uuid}&amp;invite={participant-uuid}</code></pre>
+			<p><?php esc_html_e( 'The link can point to any page on the site — the plugin detects the query parameters on every page load.', 'gawg' ); ?></p>
+			<h3><?php esc_html_e( 'Viewing entry counts', 'gawg' ); ?></h3>
+			<p>
+				<?php
+				printf(
+					/* translators: %s: link to the Participants list screen */
+					wp_kses(
+						__( 'The <a href="%s">Participants list</a> shows an Entries column with the current count per giveaway. Each participant\'s edit screen also shows an "Entries &amp; Invite Links" panel with the count and a copyable invite link for every giveaway they are enrolled in.', 'gawg' ),
+						array( 'a' => array( 'href' => array() ) )
+					),
+					esc_url( admin_url( 'edit.php?post_type=' . GAWG_Participant::POST_TYPE ) )
+				);
+				?>
+			</p>
 		</div>
 		<?php
 	}
@@ -813,6 +856,176 @@ class GAWG_Admin {
 
 		$result['pass']    = true;
 		$result['message'] = 'Participant correctly linked to 2 giveaways (term IDs: ' . $term_id1 . ', ' . $term_id2 . ').';
+		return $result;
+	}
+
+	private static function make_test_participant_in_giveaway() {
+		$ts   = gmdate( 'Y-m-d H:i:s' ) . ' ' . wp_generate_uuid4();
+		$term = wp_insert_term( 'GAWG Test Giveaway – ' . $ts, GAWG_Giveaway::TAXONOMY );
+		if ( is_wp_error( $term ) ) {
+			return array( 'error' => 'Failed to insert giveaway: ' . $term->get_error_message() );
+		}
+		$term_id = $term['term_id'];
+		update_term_meta( $term_id, self::META_TEST_FLAG, '1' );
+		GAWG_Giveaway::maybe_generate_uuid( $term_id );
+		$giveaway_uuid = get_term_meta( $term_id, GAWG_Giveaway::META_UUID, true );
+
+		$post_id = wp_insert_post( array(
+			'post_title'  => 'test-' . $ts . '@example.com',
+			'post_type'   => GAWG_Participant::POST_TYPE,
+			'post_status' => 'publish',
+		), true );
+		if ( is_wp_error( $post_id ) ) {
+			wp_delete_term( $term_id, GAWG_Giveaway::TAXONOMY );
+			return array( 'error' => 'Failed to insert participant: ' . $post_id->get_error_message() );
+		}
+		update_post_meta( $post_id, self::META_TEST_FLAG, '1' );
+		wp_set_object_terms( $post_id, $term_id, GAWG_Giveaway::TAXONOMY );
+
+		return array(
+			'post_id'       => $post_id,
+			'term_id'       => $term_id,
+			'giveaway_uuid' => $giveaway_uuid,
+		);
+	}
+
+	private static function test_entries_default_one() {
+		$result = array(
+			'id'      => 'entries_default_one',
+			'name'    => 'Entries Default to 1 After Form Submit',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id       = $setup['post_id'];
+		$giveaway_uuid = $setup['giveaway_uuid'];
+
+		update_post_meta( $post_id, GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid, 1 );
+		$entries = (int) get_post_meta( $post_id, GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid, true );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		if ( 1 !== $entries ) {
+			$result['message'] = 'Expected 1 entry, got ' . $entries;
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Entry count correctly initialised to 1.';
+		return $result;
+	}
+
+	private static function test_invite_url_format() {
+		$result = array(
+			'id'      => 'invite_url_format',
+			'name'    => 'Invite URL Contains Correct Query Params',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$giveaway_uuid    = wp_generate_uuid4();
+		$participant_uuid = wp_generate_uuid4();
+
+		$url = GAWG_Form::build_invite_url( $giveaway_uuid, $participant_uuid );
+
+		$parsed = wp_parse_url( $url );
+		$query  = array();
+		if ( isset( $parsed['query'] ) ) {
+			wp_parse_str( $parsed['query'], $query );
+		}
+
+		if ( ! isset( $query['gwag-giveaway'] ) || $query['gwag-giveaway'] !== $giveaway_uuid ) {
+			$result['message'] = 'Missing or wrong gwag-giveaway param in: ' . $url;
+			return $result;
+		}
+
+		if ( ! isset( $query['invite'] ) || $query['invite'] !== $participant_uuid ) {
+			$result['message'] = 'Missing or wrong invite param in: ' . $url;
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'URL format correct: ' . $url;
+		return $result;
+	}
+
+	private static function test_new_ip_increments_entries() {
+		$result = array(
+			'id'      => 'new_ip_increments_entries',
+			'name'    => 'New IP Increments Entry Count',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id       = $setup['post_id'];
+		$giveaway_uuid = $setup['giveaway_uuid'];
+
+		update_post_meta( $post_id, GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid, 1 );
+
+		GAWG_Form::process_invite( $post_id, $giveaway_uuid, '192.0.2.1' );
+
+		$entries = (int) get_post_meta( $post_id, GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid, true );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		if ( 2 !== $entries ) {
+			$result['message'] = 'Expected 2 entries after new IP, got ' . $entries;
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Entry count incremented to 2 after unique IP visit.';
+		return $result;
+	}
+
+	private static function test_duplicate_ip_no_increment() {
+		$result = array(
+			'id'      => 'duplicate_ip_no_increment',
+			'name'    => 'Duplicate IP Does Not Double-Increment Entries',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id       = $setup['post_id'];
+		$giveaway_uuid = $setup['giveaway_uuid'];
+
+		update_post_meta( $post_id, GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid, 1 );
+
+		GAWG_Form::process_invite( $post_id, $giveaway_uuid, '192.0.2.2' );
+		GAWG_Form::process_invite( $post_id, $giveaway_uuid, '192.0.2.2' ); // same IP again
+
+		$entries = (int) get_post_meta( $post_id, GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid, true );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		if ( 2 !== $entries ) {
+			$result['message'] = 'Expected 2 entries (not double-counted), got ' . $entries;
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Entry count stayed at 2; duplicate IP correctly ignored.';
 		return $result;
 	}
 
