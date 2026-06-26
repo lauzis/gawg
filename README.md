@@ -13,7 +13,9 @@ It could be useful for anyone running small giveaways on a WordPress site withou
 - **Auto-generated UUIDs** — a v4 UUID is created automatically for both giveaway terms (on save) and participant posts (on publish), displayed in edit screens for easy copying.
 - **`[gawg_form]` shortcode** — embeds an AJAX entry form on any page or post; collects an email address, optionally links to the giveaway rules (via `rules_url` or `rules_post_id`), prevents duplicate entries per giveaway, and displays a configurable HTML success message (`success_message`).
 - **`gawg/form` Gutenberg block** — a dynamic block that wraps the `[gawg_form]` shortcode; configure the giveaway and rules URL from the block's Inspector Controls panel and see a live server-side preview in the editor.
-- **Google reCAPTCHA v2** — optional spam protection for the entry form; configure your site key and secret key on the Settings page and the checkbox widget is automatically rendered in the form, blocking submission until solved.
+- **Spam protection** — two layers of defence on every form submission:
+  - **Honeypot** — a hidden field invisible to real users; if a bot fills it in, the submission is silently rejected server-side.
+  - **Google reCAPTCHA v2** — optional; when both a Site Key and Secret Key are saved on the Settings page the "I'm not a robot" checkbox widget is automatically rendered in the form and the response is verified server-side. When no keys are configured reCAPTCHA is skipped entirely.
 - **Admin UI** — a dedicated GAWG menu in the WordPress admin with:
   - **Participants** — list and manage all participant posts.
   - **Giveaways** — list and manage all giveaway taxonomy terms.
@@ -44,7 +46,7 @@ It could be useful for anyone running small giveaways on a WordPress site withou
 4. Go to **GAWG → Participants** to view all entries, filtered by giveaway if needed.
 
 ## Current State
-The plugin is in early development (v1.0.0). Giveaways are modelled as a custom taxonomy and participants as a custom post type, both with auto-generated reference UUIDs. The `[gawg_form]` shortcode and the `gawg/form` Gutenberg block both enable front-end AJAX entry collection; both share the same rendering code so changes to the shortcode output apply to both automatically. Optional Google reCAPTCHA v2 (checkbox) integration is available to prevent spam submissions — configure it via **GAWG → Settings**. Winner-drawing functionality is planned for a future release.
+The plugin is in early development (v1.0.0). Giveaways are modelled as a custom taxonomy and participants as a custom post type, both with auto-generated reference UUIDs. The `[gawg_form]` shortcode and the `gawg/form` Gutenberg block both enable front-end AJAX entry collection; both share the same rendering code so changes to the shortcode output apply to both automatically. Every form includes a honeypot field that silently rejects bot submissions server-side. Optional Google reCAPTCHA v2 (checkbox) integration is also available — configure it via **GAWG → Settings** and it is activated automatically when both keys are present. Winner-drawing functionality is planned for a future release.
 
 ## Development
 This project is maintained with the assistance of [Claude Code](https://claude.ai/code) and [CodeRabbit](https://coderabbit.ai).

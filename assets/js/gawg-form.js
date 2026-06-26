@@ -13,11 +13,12 @@
 		form.addEventListener( 'submit', function ( e ) {
 			e.preventDefault();
 
-			var emailEl = form.querySelector( '[name="gawg_email"]' );
-			var rulesEl = form.querySelector( '[name="gawg_rules"]' );
-			var uuidEl  = form.querySelector( '[name="gawg_uuid"]' );
-			var nonceEl = form.querySelector( '[name="_gawg_nonce"]' );
-			var btn     = form.querySelector( '[type="submit"]' );
+			var emailEl    = form.querySelector( '[name="gawg_email"]' );
+			var rulesEl    = form.querySelector( '[name="gawg_rules"]' );
+			var uuidEl     = form.querySelector( '[name="gawg_uuid"]' );
+			var nonceEl    = form.querySelector( '[name="_gawg_nonce"]' );
+			var honeypotEl = form.querySelector( '[name="gawg_hp"]' );
+			var btn        = form.querySelector( '[type="submit"]' );
 
 			clearMessage( message );
 
@@ -41,9 +42,10 @@
 
 			var data = new FormData();
 			data.append( 'action',      gawgFormConfig.action );
-			data.append( '_gawg_nonce', nonceEl ? nonceEl.value : '' );
-			data.append( 'gawg_uuid',   uuidEl  ? uuidEl.value  : '' );
+			data.append( '_gawg_nonce', nonceEl    ? nonceEl.value    : '' );
+			data.append( 'gawg_uuid',   uuidEl     ? uuidEl.value     : '' );
 			data.append( 'gawg_email',  emailEl.value.trim() );
+			data.append( 'gawg_hp',     honeypotEl ? honeypotEl.value : '' );
 
 			if ( gawgFormConfig.recaptchaEnabled ) {
 				var recaptchaResponse = form.querySelector( '.g-recaptcha-response' );

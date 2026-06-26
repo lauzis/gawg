@@ -98,6 +98,7 @@ class GAWG_Form {
 			<form class="gawg-form" novalidate>
 				<?php wp_nonce_field( 'gawg_form_' . $uuid, '_gawg_nonce', false ); ?>
 				<input type="hidden" name="gawg_uuid" value="<?php echo esc_attr( $uuid ); ?>">
+				<input type="text" name="gawg_hp" value="" style="display:none !important;" autocomplete="off" tabindex="-1" aria-hidden="true">
 				<p>
 					<label for="<?php echo esc_attr( $wrap_id . '-email' ); ?>">
 						<?php esc_html_e( 'Email address', 'gawg' ); ?>
@@ -146,6 +147,11 @@ class GAWG_Form {
 
 		if ( '' === $uuid || ! wp_verify_nonce( $nonce, 'gawg_form_' . $uuid ) ) {
 			wp_send_json_error( array( 'message' => __( 'Security check failed.', 'gawg' ) ), 403 );
+		}
+
+		$honeypot = isset( $_POST['gawg_hp'] ) ? (string) wp_unslash( $_POST['gawg_hp'] ) : '';
+		if ( '' !== $honeypot ) {
+			wp_send_json_error( array( 'message' => __( 'Submission rejected.', 'gawg' ) ), 400 );
 		}
 
 		$email = isset( $_POST['gawg_email'] ) ? strtolower( sanitize_email( wp_unslash( $_POST['gawg_email'] ) ) ) : '';
