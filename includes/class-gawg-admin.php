@@ -3,9 +3,13 @@ defined( 'ABSPATH' ) || exit;
 
 class GAWG_Admin {
 
+	const META_TEST_FLAG = '_gawg_is_test';
+
 	private static $tests = array(
-		'create_participant_has_uuid'    => 'Create Participant Has UUID',
-		'create_giveaway_term_has_uuid'  => 'Create Giveaway Term Has UUID',
+		'create_participant_has_uuid'         => 'Create Participant Has UUID',
+		'create_giveaway_term_has_uuid'       => 'Create Giveaway Term Has UUID',
+		'link_participant_single_giveaway'    => 'Participant Linked to Single Giveaway',
+		'link_participant_multiple_giveaways' => 'Participant Linked to Multiple Giveaways',
 	);
 
 	public static function init() {
@@ -184,8 +188,16 @@ class GAWG_Admin {
 				case 'create_giveaway_term_has_uuid':
 					$results[] = self::test_create_giveaway_term_has_uuid();
 					break;
+				case 'link_participant_single_giveaway':
+					$results[] = self::test_link_participant_single_giveaway();
+					break;
+				case 'link_participant_multiple_giveaways':
+					$results[] = self::test_link_participant_multiple_giveaways();
+					break;
 			}
 		}
+
+		self::cleanup_test_data();
 
 		wp_send_json_success( $results );
 	}
@@ -220,6 +232,17 @@ class GAWG_Admin {
 				</li>
 				<li><?php esc_html_e( 'Click Add New Giveaway. A unique UUID is automatically assigned and shown in the Reference UUID field when you next edit the term.', 'gawg' ); ?></li>
 				<li><?php esc_html_e( 'Share the UUID or an entry link with your audience so they can participate.', 'gawg' ); ?></li>
+			</ol>
+
+			<h2><?php esc_html_e( 'Creating a Giveaway Rules Page', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'A rules page describes the terms, eligibility, and prize details of your giveaway. While optional, it is strongly recommended: when a rules URL is provided, a required acceptance checkbox is shown in the entry form, giving participants informed consent.', 'gawg' ); ?>
+			</p>
+			<ol>
+				<li><?php esc_html_e( 'In WordPress, go to Pages → Add New (or Posts → Add New if you prefer a post).', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'Write your giveaway rules: eligibility requirements, how to enter, prize details, draw date, and any other relevant terms.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'Publish the page and copy its URL (Permalink) from the address bar or the Permalink field in the editor.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'Use this URL as the rules_url attribute in the [gawg_form] shortcode, or paste it into the Rules URL field in the Giveaway Form block Inspector Controls.', 'gawg' ); ?></li>
 			</ol>
 
 			<h2><?php esc_html_e( 'Adding Participants', 'gawg' ); ?></h2>
@@ -347,6 +370,8 @@ class GAWG_Admin {
 			return $result;
 		}
 
+		update_post_meta( $post_id, self::META_TEST_FLAG, '1' );
+
 		$uuid = get_post_meta( $post_id, GAWG_Participant::META_UUID, true );
 
 		wp_delete_post( $post_id, true );
@@ -356,13 +381,13 @@ class GAWG_Admin {
 			return $result;
 		}
 
-		if ( get_post( $post_id ) ) {
-			$result['message'] = 'Post was not deleted (UUID was: ' . $uuid . ').';
+		if ( ! self::is_valid_uuid_v4( $uuid ) ) {
+			$result['message'] = 'UUID is not a valid v4 UUID: ' . $uuid;
 			return $result;
 		}
 
 		$result['pass']    = true;
-		$result['message'] = 'UUID: ' . $uuid . ' — Post deleted successfully.';
+		$result['message'] = 'UUID: ' . $uuid;
 		return $result;
 	}
 
@@ -385,7 +410,9 @@ class GAWG_Admin {
 		}
 
 		$term_id = $term['term_id'];
-		$uuid    = get_term_meta( $term_id, GAWG_Giveaway::META_UUID, true );
+		update_term_meta( $term_id, self::META_TEST_FLAG, '1' );
+
+		$uuid = get_term_meta( $term_id, GAWG_Giveaway::META_UUID, true );
 
 		wp_delete_term( $term_id, GAWG_Giveaway::TAXONOMY );
 
@@ -394,8 +421,185 @@ class GAWG_Admin {
 			return $result;
 		}
 
+		if ( ! self::is_valid_uuid_v4( $uuid ) ) {
+			$result['message'] = 'UUID is not a valid v4 UUID: ' . $uuid;
+			return $result;
+		}
+
 		$result['pass']    = true;
-		$result['message'] = 'UUID: ' . $uuid . ' — Term deleted successfully.';
+		$result['message'] = 'UUID: ' . $uuid;
 		return $result;
+	}
+
+	private static function test_link_participant_single_giveaway() {
+		$result = array(
+			'id'      => 'link_participant_single_giveaway',
+			'name'    => 'Participant Linked to Single Giveaway',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$ts   = gmdate( 'Y-m-d H:i:s' );
+		$term = wp_insert_term( 'GAWG Test Giveaway – ' . $ts, GAWG_Giveaway::TAXONOMY );
+
+		if ( is_wp_error( $term ) ) {
+			$result['message'] = 'Failed to insert giveaway term: ' . $term->get_error_message();
+			return $result;
+		}
+
+		$term_id = $term['term_id'];
+		update_term_meta( $term_id, self::META_TEST_FLAG, '1' );
+
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'GAWG Test Participant – ' . $ts,
+				'post_type'   => GAWG_Participant::POST_TYPE,
+				'post_status' => 'publish',
+			),
+			true
+		);
+
+		if ( is_wp_error( $post_id ) ) {
+			wp_delete_term( $term_id, GAWG_Giveaway::TAXONOMY );
+			$result['message'] = 'Failed to insert participant post: ' . $post_id->get_error_message();
+			return $result;
+		}
+
+		update_post_meta( $post_id, self::META_TEST_FLAG, '1' );
+
+		$assigned = wp_set_object_terms( $post_id, $term_id, GAWG_Giveaway::TAXONOMY );
+
+		if ( is_wp_error( $assigned ) ) {
+			wp_delete_post( $post_id, true );
+			wp_delete_term( $term_id, GAWG_Giveaway::TAXONOMY );
+			$result['message'] = 'Failed to assign taxonomy term: ' . $assigned->get_error_message();
+			return $result;
+		}
+
+		$terms = wp_get_object_terms( $post_id, GAWG_Giveaway::TAXONOMY, array( 'fields' => 'ids' ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $term_id, GAWG_Giveaway::TAXONOMY );
+
+		if ( is_wp_error( $terms ) || ! in_array( $term_id, $terms, true ) ) {
+			$result['message'] = 'Participant was not linked to the giveaway term.';
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Participant correctly linked to 1 giveaway (term ID: ' . $term_id . ').';
+		return $result;
+	}
+
+	private static function test_link_participant_multiple_giveaways() {
+		$result = array(
+			'id'      => 'link_participant_multiple_giveaways',
+			'name'    => 'Participant Linked to Multiple Giveaways',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$ts    = gmdate( 'Y-m-d H:i:s' );
+		$term1 = wp_insert_term( 'GAWG Test Giveaway A – ' . $ts, GAWG_Giveaway::TAXONOMY );
+		$term2 = wp_insert_term( 'GAWG Test Giveaway B – ' . $ts, GAWG_Giveaway::TAXONOMY );
+
+		if ( is_wp_error( $term1 ) || is_wp_error( $term2 ) ) {
+			if ( ! is_wp_error( $term1 ) ) {
+				wp_delete_term( $term1['term_id'], GAWG_Giveaway::TAXONOMY );
+			}
+			$result['message'] = 'Failed to insert giveaway terms.';
+			return $result;
+		}
+
+		$term_id1 = $term1['term_id'];
+		$term_id2 = $term2['term_id'];
+		update_term_meta( $term_id1, self::META_TEST_FLAG, '1' );
+		update_term_meta( $term_id2, self::META_TEST_FLAG, '1' );
+
+		$post_id = wp_insert_post(
+			array(
+				'post_title'  => 'GAWG Test Participant – ' . $ts,
+				'post_type'   => GAWG_Participant::POST_TYPE,
+				'post_status' => 'publish',
+			),
+			true
+		);
+
+		if ( is_wp_error( $post_id ) ) {
+			wp_delete_term( $term_id1, GAWG_Giveaway::TAXONOMY );
+			wp_delete_term( $term_id2, GAWG_Giveaway::TAXONOMY );
+			$result['message'] = 'Failed to insert participant post: ' . $post_id->get_error_message();
+			return $result;
+		}
+
+		update_post_meta( $post_id, self::META_TEST_FLAG, '1' );
+
+		$assigned = wp_set_object_terms( $post_id, array( $term_id1, $term_id2 ), GAWG_Giveaway::TAXONOMY );
+
+		if ( is_wp_error( $assigned ) ) {
+			wp_delete_post( $post_id, true );
+			wp_delete_term( $term_id1, GAWG_Giveaway::TAXONOMY );
+			wp_delete_term( $term_id2, GAWG_Giveaway::TAXONOMY );
+			$result['message'] = 'Failed to assign taxonomy terms: ' . $assigned->get_error_message();
+			return $result;
+		}
+
+		$terms = wp_get_object_terms( $post_id, GAWG_Giveaway::TAXONOMY, array( 'fields' => 'ids' ) );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $term_id1, GAWG_Giveaway::TAXONOMY );
+		wp_delete_term( $term_id2, GAWG_Giveaway::TAXONOMY );
+
+		if ( is_wp_error( $terms ) ) {
+			$result['message'] = 'Failed to retrieve taxonomy terms: ' . $terms->get_error_message();
+			return $result;
+		}
+
+		if ( ! in_array( $term_id1, $terms, true ) || ! in_array( $term_id2, $terms, true ) ) {
+			$result['message'] = 'Participant was not linked to all giveaway terms. Found term IDs: ' . implode( ', ', $terms );
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Participant correctly linked to 2 giveaways (term IDs: ' . $term_id1 . ', ' . $term_id2 . ').';
+		return $result;
+	}
+
+	private static function cleanup_test_data() {
+		$posts = get_posts( array(
+			'post_type'      => GAWG_Participant::POST_TYPE,
+			'post_status'    => 'any',
+			'posts_per_page' => -1,
+			'meta_key'       => self::META_TEST_FLAG,
+			'meta_value'     => '1',
+			'fields'         => 'ids',
+		) );
+		foreach ( $posts as $post_id ) {
+			wp_delete_post( $post_id, true );
+		}
+
+		$terms = get_terms( array(
+			'taxonomy'   => GAWG_Giveaway::TAXONOMY,
+			'hide_empty' => false,
+			'meta_query' => array(
+				array(
+					'key'   => self::META_TEST_FLAG,
+					'value' => '1',
+				),
+			),
+			'fields'     => 'ids',
+		) );
+		if ( ! is_wp_error( $terms ) ) {
+			foreach ( $terms as $term_id ) {
+				wp_delete_term( $term_id, GAWG_Giveaway::TAXONOMY );
+			}
+		}
+	}
+
+	private static function is_valid_uuid_v4( $uuid ) {
+		return (bool) preg_match(
+			'/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+			$uuid
+		);
 	}
 }
