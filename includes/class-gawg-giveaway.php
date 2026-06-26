@@ -3,8 +3,9 @@ defined( 'ABSPATH' ) || exit;
 
 class GAWG_Giveaway {
 
-	const TAXONOMY = 'gawg_giveaway';
-	const META_UUID = '_gawg_uuid';
+	const TAXONOMY    = 'gawg_giveaway';
+	const META_UUID   = '_gawg_uuid';
+	const META_WINNER = '_gawg_winner';
 
 	public static function init() {
 		add_action( 'init', array( __CLASS__, 'register_taxonomy' ) );
@@ -13,6 +14,7 @@ class GAWG_Giveaway {
 		add_action( 'edited_' . self::TAXONOMY,  array( __CLASS__, 'maybe_generate_uuid' ) );
 		add_action( self::TAXONOMY . '_add_form_fields',  array( __CLASS__, 'render_uuid_field_new' ) );
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_uuid_field_edit' ) );
+		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_winner_field_edit' ) );
 	}
 
 	public static function register_taxonomy() {
@@ -62,6 +64,19 @@ class GAWG_Giveaway {
 				},
 			)
 		);
+		register_term_meta(
+			self::TAXONOMY,
+			self::META_WINNER,
+			array(
+				'type'              => 'integer',
+				'single'            => true,
+				'default'           => 0,
+				'sanitize_callback' => 'absint',
+				'auth_callback'     => function() {
+					return current_user_can( 'manage_options' );
+				},
+			)
+		);
 	}
 
 	public static function maybe_generate_uuid( $term_id ) {
@@ -78,6 +93,29 @@ class GAWG_Giveaway {
 			<label><?php esc_html_e( 'Reference UUID', 'gawg' ); ?></label>
 			<p><?php esc_html_e( 'UUID will be generated automatically when the giveaway is saved.', 'gawg' ); ?></p>
 		</div>
+		<?php
+	}
+
+	public static function render_winner_field_edit( $term ) {
+		$winner_id = (int) get_term_meta( $term->term_id, self::META_WINNER, true );
+		if ( 0 === $winner_id ) {
+			return;
+		}
+		$winner_post  = get_post( $winner_id );
+		$winner_email = $winner_post ? $winner_post->post_title : __( 'Participant not found.', 'gawg' );
+		?>
+		<tr class="form-field">
+			<th scope="row"><label><?php esc_html_e( 'Winner', 'gawg' ); ?></label></th>
+			<td>
+				<input
+					type="text"
+					readonly
+					value="<?php echo esc_attr( $winner_email ); ?>"
+					style="width:100%;font-family:monospace;"
+				/>
+				<p class="description"><?php esc_html_e( 'The winner drawn for this giveaway.', 'gawg' ); ?></p>
+			</td>
+		</tr>
 		<?php
 	}
 

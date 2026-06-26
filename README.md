@@ -16,9 +16,11 @@ It could be useful for anyone running small giveaways on a WordPress site withou
 - **Spam protection** — two layers of defence on every form submission:
   - **Honeypot** — a hidden field invisible to real users; if a bot fills it in, the submission is silently rejected server-side.
   - **Google reCAPTCHA v2** — optional; when both a Site Key and Secret Key are saved on the Settings page the "I'm not a robot" checkbox widget is automatically rendered in the form and the response is verified server-side. When no keys are configured reCAPTCHA is skipped entirely.
+- **Draw Winner** — a dedicated admin page (**GAWG → Draw Winner**) for running the lottery: select an active giveaway, view a masked participant list (first char + `****` + last char + @domain), configure shuffle count and delay, then click **Shuffle & Pick Winner** to animate through the list and select a random winner server-side. The winner's post ID is saved to the giveaway term and the masked email is displayed. The winner also appears as a read-only field on the giveaway's taxonomy edit screen.
 - **Admin UI** — a dedicated GAWG menu in the WordPress admin with:
   - **Participants** — list and manage all participant posts.
-  - **Giveaways** — list and manage all giveaway taxonomy terms.
+  - **Giveaways** — list and manage all giveaway taxonomy terms. Each term's edit screen shows a read-only **Winner** field once a winner has been drawn.
+  - **Draw Winner** page — select a giveaway, shuffle participants, and pick a winner at random.
   - **Self Tests** page — run built-in verification checks (e.g. UUID generation) directly from the admin panel.
   - **Help** page — step-by-step instructions for creating giveaways, adding participants, and embedding the entry form.
   - **Settings** page — configure plugin-wide options such as Google reCAPTCHA keys.
@@ -46,7 +48,7 @@ It could be useful for anyone running small giveaways on a WordPress site withou
 4. Go to **GAWG → Participants** to view all entries, filtered by giveaway if needed.
 
 ## Current State
-The plugin is in early development (v1.0.0). Giveaways are modelled as a custom taxonomy and participants as a custom post type, both with auto-generated reference UUIDs. The `[gawg_form]` shortcode and the `gawg/form` Gutenberg block both enable front-end AJAX entry collection; both share the same rendering code so changes to the shortcode output apply to both automatically. Every form includes a honeypot field that silently rejects bot submissions server-side. Optional Google reCAPTCHA v2 (checkbox) integration is also available — configure it via **GAWG → Settings** and it is activated automatically when both keys are present. Winner-drawing functionality is planned for a future release.
+The plugin is in early development (v1.0.0). Giveaways are modelled as a custom taxonomy and participants as a custom post type, both with auto-generated reference UUIDs. The `[gawg_form]` shortcode and the `gawg/form` Gutenberg block both enable front-end AJAX entry collection; both share the same rendering code so changes to the shortcode output apply to both automatically. Every form includes a honeypot field that silently rejects bot submissions server-side. Optional Google reCAPTCHA v2 (checkbox) integration is also available — configure it via **GAWG → Settings** and it is activated automatically when both keys are present. The **Draw Winner** page (**GAWG → Draw Winner**) allows selecting an active giveaway, viewing participants with masked emails, running an animated shuffle, and picking a random winner server-side; the winner is stored on the giveaway term and displayed read-only on its edit screen.
 
 ## Development
 This project is maintained with the assistance of [Claude Code](https://claude.ai/code) and [CodeRabbit](https://coderabbit.ai).
