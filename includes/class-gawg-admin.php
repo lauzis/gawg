@@ -283,6 +283,44 @@ class GAWG_Admin {
 				<li><strong>success_message</strong> — <?php esc_html_e( '(optional) HTML shown after a successful submission. Defaults to a translatable thank-you message.', 'gawg' ); ?></li>
 			</ul>
 			<p><?php esc_html_e( 'If the same email address is submitted for the same giveaway more than once, the form displays "You are already in the list of participants" and no duplicate entry is created.', 'gawg' ); ?></p>
+
+			<h2><?php esc_html_e( 'Settings', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'The Settings page (GAWG → Settings) contains plugin-wide configuration options.', 'gawg' ); ?>
+			</p>
+
+			<h3><?php esc_html_e( 'Google reCAPTCHA v2', 'gawg' ); ?></h3>
+			<p>
+				<?php esc_html_e( 'To protect the entry form from spam, you can enable Google reCAPTCHA v2 (checkbox). When configured, a "I\'m not a robot" checkbox is rendered inside the form and submission is blocked until the challenge is solved.', 'gawg' ); ?>
+			</p>
+			<ol>
+				<li>
+					<?php
+					printf(
+						/* translators: %s: link to Google reCAPTCHA admin */
+						wp_kses(
+							__( 'Register your site at <a href="%s" target="_blank" rel="noopener noreferrer">google.com/recaptcha</a> and choose reCAPTCHA v2 (checkbox type).', 'gawg' ),
+							array( 'a' => array( 'href' => array(), 'target' => array(), 'rel' => array() ) )
+						),
+						'https://www.google.com/recaptcha/admin/create'
+					);
+					?>
+				</li>
+				<li><?php esc_html_e( 'Copy the Site Key and Secret Key from the reCAPTCHA admin panel.', 'gawg' ); ?></li>
+				<li>
+					<?php
+					printf(
+						/* translators: %s: link to the GAWG Settings page */
+						wp_kses(
+							__( 'Paste both keys into the <a href="%s">GAWG Settings</a> page and save.', 'gawg' ),
+							array( 'a' => array( 'href' => array() ) )
+						),
+						esc_url( admin_url( 'admin.php?page=crb_gawg_settings.php' ) )
+					);
+					?>
+				</li>
+				<li><?php esc_html_e( 'The reCAPTCHA widget will now appear automatically in every [gawg_form] or Giveaway Form block on your site.', 'gawg' ); ?></li>
+			</ol>
 		</div>
 		<?php
 	}

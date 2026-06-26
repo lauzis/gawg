@@ -7,6 +7,7 @@ class GAWG {
 		GAWG_Participant::init();
 		GAWG_Giveaway::init();
 		GAWG_Admin::init();
+		GAWG_Settings::init();
 		GAWG_Form::init();
 		GAWG_Block::init();
 	}

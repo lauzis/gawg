@@ -26,6 +26,13 @@ class GAWG_Form {
 			GAWG_VERSION,
 			true
 		);
+		wp_register_script(
+			'google-recaptcha',
+			'https://www.google.com/recaptcha/api.js',
+			array(),
+			null,
+			true
+		);
 	}
 
 	public static function render_shortcode( $atts ) {
@@ -56,18 +63,26 @@ class GAWG_Form {
 			? wp_kses_post( $atts['success_message'] )
 			: '<p>' . esc_html__( 'Thank you for applying! You are now in the list of participants.', 'gawg' ) . '</p>';
 
+		$recaptcha_site_key = GAWG_Settings::get_recaptcha_site_key();
+		$recaptcha_enabled  = GAWG_Settings::is_recaptcha_enabled();
+
 		wp_enqueue_script( 'gawg-form' );
+		if ( $recaptcha_enabled ) {
+			wp_enqueue_script( 'google-recaptcha' );
+		}
 		if ( ! self::$script_localized ) {
 			wp_localize_script(
 				'gawg-form',
 				'gawgFormConfig',
 				array(
-					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-					'action'  => self::AJAX_ACTION,
-					'i18n'    => array(
-						'invalidEmail' => __( 'Please enter a valid email address.', 'gawg' ),
-						'acceptRules'  => __( 'Please accept the giveaway rules.', 'gawg' ),
-						'networkError' => __( 'A network error occurred. Please try again.', 'gawg' ),
+					'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
+					'action'           => self::AJAX_ACTION,
+					'recaptchaEnabled' => $recaptcha_enabled,
+					'i18n'             => array(
+						'invalidEmail'    => __( 'Please enter a valid email address.', 'gawg' ),
+						'acceptRules'     => __( 'Please accept the giveaway rules.', 'gawg' ),
+						'networkError'    => __( 'A network error occurred. Please try again.', 'gawg' ),
+						'solveRecaptcha'  => __( 'Please complete the reCAPTCHA challenge.', 'gawg' ),
 					),
 				)
 			);
@@ -112,6 +127,9 @@ class GAWG_Form {
 					</label>
 				</p>
 				<?php endif; ?>
+				<?php if ( $recaptcha_enabled ) : ?>
+				<div class="g-recaptcha" data-sitekey="<?php echo esc_attr( $recaptcha_site_key ); ?>"></div>
+				<?php endif; ?>
 				<p>
 					<button type="submit"><?php esc_html_e( 'Apply', 'gawg' ); ?></button>
 				</p>
@@ -133,6 +151,13 @@ class GAWG_Form {
 		$email = isset( $_POST['gawg_email'] ) ? strtolower( sanitize_email( wp_unslash( $_POST['gawg_email'] ) ) ) : '';
 		if ( '' === $email || ! is_email( $email ) ) {
 			wp_send_json_error( array( 'message' => __( 'Please enter a valid email address.', 'gawg' ) ) );
+		}
+
+		if ( GAWG_Settings::is_recaptcha_enabled() ) {
+			$recaptcha_response = isset( $_POST['g-recaptcha-response'] ) ? sanitize_text_field( wp_unslash( $_POST['g-recaptcha-response'] ) ) : '';
+			if ( '' === $recaptcha_response || ! self::verify_recaptcha( $recaptcha_response ) ) {
+				wp_send_json_error( array( 'message' => __( 'reCAPTCHA verification failed. Please try again.', 'gawg' ) ) );
+			}
 		}
 
 		$term = self::find_term_by_uuid( $uuid );
@@ -160,6 +185,22 @@ class GAWG_Form {
 		wp_set_object_terms( $post_id, $term->term_id, GAWG_Giveaway::TAXONOMY );
 
 		wp_send_json_success();
+	}
+
+	private static function verify_recaptcha( $token ) {
+		$response = wp_remote_post( 'https://www.google.com/recaptcha/api/siteverify', array(
+			'body' => array(
+				'secret'   => GAWG_Settings::get_recaptcha_secret_key(),
+				'response' => $token,
+			),
+		) );
+
+		if ( is_wp_error( $response ) ) {
+			return false;
+		}
+
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+		return isset( $body['success'] ) && true === $body['success'];
 	}
 
 	private static function find_term_by_uuid( $uuid ) {

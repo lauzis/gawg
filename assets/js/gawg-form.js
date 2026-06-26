@@ -31,11 +31,26 @@
 				return;
 			}
 
+			if ( gawgFormConfig.recaptchaEnabled ) {
+				var recaptchaEl = form.querySelector( '.g-recaptcha-response' );
+				if ( ! recaptchaEl || ! recaptchaEl.value ) {
+					showMessage( message, gawgFormConfig.i18n.solveRecaptcha, 'error' );
+					return;
+				}
+			}
+
 			var data = new FormData();
 			data.append( 'action',      gawgFormConfig.action );
 			data.append( '_gawg_nonce', nonceEl ? nonceEl.value : '' );
 			data.append( 'gawg_uuid',   uuidEl  ? uuidEl.value  : '' );
 			data.append( 'gawg_email',  emailEl.value.trim() );
+
+			if ( gawgFormConfig.recaptchaEnabled ) {
+				var recaptchaResponse = form.querySelector( '.g-recaptcha-response' );
+				if ( recaptchaResponse ) {
+					data.append( 'g-recaptcha-response', recaptchaResponse.value );
+				}
+			}
 
 			btn.disabled = true;
 
@@ -50,11 +65,17 @@
 							? response.data.message
 							: gawgFormConfig.i18n.networkError;
 						showMessage( message, msg, 'error' );
+						if ( gawgFormConfig.recaptchaEnabled && window.grecaptcha ) {
+							window.grecaptcha.reset();
+						}
 						btn.disabled = false;
 					}
 				} )
 				.catch( function () {
 					showMessage( message, gawgFormConfig.i18n.networkError, 'error' );
+					if ( gawgFormConfig.recaptchaEnabled && window.grecaptcha ) {
+						window.grecaptcha.reset();
+					}
 					btn.disabled = false;
 				} );
 		} );
