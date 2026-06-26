@@ -9,6 +9,7 @@ class GAWG_Form {
 
 	public static function init() {
 		add_action( 'init',               array( __CLASS__, 'register_shortcode' ) );
+		add_action( 'init',               array( __CLASS__, 'handle_invite_link' ) );
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'register_assets' ) );
 		add_action( 'wp_ajax_' . self::AJAX_ACTION,        array( __CLASS__, 'ajax_submit' ) );
 		add_action( 'wp_ajax_nopriv_' . self::AJAX_ACTION, array( __CLASS__, 'ajax_submit' ) );
@@ -83,6 +84,8 @@ class GAWG_Form {
 						'acceptRules'     => __( 'Please accept the giveaway rules.', 'gawg' ),
 						'networkError'    => __( 'A network error occurred. Please try again.', 'gawg' ),
 						'solveRecaptcha'  => __( 'Please complete the reCAPTCHA challenge.', 'gawg' ),
+						'inviteHeading'   => __( 'Share your invite link to earn extra entries:', 'gawg' ),
+						'inviteDesc'      => __( 'Each unique visitor who uses your link earns you +1 entry.', 'gawg' ),
 					),
 				)
 			);
@@ -190,7 +193,97 @@ class GAWG_Form {
 
 		wp_set_object_terms( $post_id, $term->term_id, GAWG_Giveaway::TAXONOMY );
 
-		wp_send_json_success();
+		// Initialise entry count to 1 for this giveaway.
+		update_post_meta( $post_id, GAWG_Participant::META_ENTRIES_PREFIX . $uuid, 1 );
+
+		// Build invite URL so the participant can share it immediately.
+		$participant_uuid = get_post_meta( $post_id, GAWG_Participant::META_UUID, true );
+		$invite_url       = '' !== $participant_uuid ? self::build_invite_url( $uuid, $participant_uuid ) : '';
+
+		wp_send_json_success( '' !== $invite_url ? array( 'invite_url' => $invite_url ) : null );
+	}
+
+	public static function handle_invite_link() {
+		if ( is_admin() || wp_doing_ajax() || wp_doing_cron() ) {
+			return;
+		}
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
+		$giveaway_uuid    = isset( $_GET['gwag-giveaway'] ) ? sanitize_text_field( wp_unslash( $_GET['gwag-giveaway'] ) ) : '';
+		$participant_uuid = isset( $_GET['invite'] )        ? sanitize_text_field( wp_unslash( $_GET['invite'] ) )        : '';
+		// phpcs:enable
+
+		if ( '' === $giveaway_uuid || '' === $participant_uuid ) {
+			return;
+		}
+
+		$term = self::find_term_by_uuid( $giveaway_uuid );
+		if ( null === $term ) {
+			return;
+		}
+
+		$participant = self::find_participant_by_uuid( $participant_uuid );
+		if ( null === $participant ) {
+			return;
+		}
+
+		if ( ! has_term( $term->term_id, GAWG_Giveaway::TAXONOMY, $participant->ID ) ) {
+			return;
+		}
+
+		$ip = self::get_visitor_ip();
+		if ( '' === $ip ) {
+			return;
+		}
+
+		self::process_invite( $participant->ID, $giveaway_uuid, $ip );
+	}
+
+	public static function build_invite_url( $giveaway_uuid, $participant_uuid ) {
+		return add_query_arg(
+			array(
+				'gwag-giveaway' => $giveaway_uuid,
+				'invite'        => $participant_uuid,
+			),
+			home_url( '/' )
+		);
+	}
+
+	public static function process_invite( $participant_id, $giveaway_uuid, $ip ) {
+		$ip_hash   = md5( $ip ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_md5
+		$visit_key = GAWG_Participant::META_VISIT_PREFIX . $giveaway_uuid . '_' . $ip_hash;
+
+		if ( '1' === get_post_meta( $participant_id, $visit_key, true ) ) {
+			return false;
+		}
+
+		$entries_key = GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid;
+		$current     = (int) get_post_meta( $participant_id, $entries_key, true );
+		if ( $current < 1 ) {
+			$current = 1;
+		}
+		update_post_meta( $participant_id, $entries_key, $current + 1 );
+		update_post_meta( $participant_id, $visit_key, '1' );
+
+		return true;
+	}
+
+	private static function get_visitor_ip() {
+		if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
+			return sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+		}
+		return '';
+	}
+
+	private static function find_participant_by_uuid( $uuid ) {
+		$posts = get_posts( array(
+			'post_type'      => GAWG_Participant::POST_TYPE,
+			'post_status'    => 'publish',
+			'meta_key'       => GAWG_Participant::META_UUID,
+			'meta_value'     => $uuid,
+			'posts_per_page' => 1,
+		) );
+		return ! empty( $posts ) ? $posts[0] : null;
 	}
 
 	private static function verify_recaptcha( $token ) {
