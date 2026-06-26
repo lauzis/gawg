@@ -13,8 +13,11 @@ class GAWG_Admin {
 	);
 
 	public static function init() {
-		add_action( 'admin_menu', array( __CLASS__, 'register_menus' ) );
-		add_action( 'wp_ajax_gawg_run_self_tests', array( __CLASS__, 'ajax_run_self_tests' ) );
+		add_action( 'admin_menu',                           array( __CLASS__, 'register_menus' ) );
+		add_action( 'admin_enqueue_scripts',                array( __CLASS__, 'enqueue_draw_winner_scripts' ) );
+		add_action( 'wp_ajax_gawg_run_self_tests',          array( __CLASS__, 'ajax_run_self_tests' ) );
+		add_action( 'wp_ajax_gawg_load_participants',       array( __CLASS__, 'ajax_load_participants' ) );
+		add_action( 'wp_ajax_gawg_pick_winner',             array( __CLASS__, 'ajax_pick_winner' ) );
 	}
 
 	public static function register_menus() {
@@ -50,6 +53,14 @@ class GAWG_Admin {
 		);
 		add_submenu_page(
 			'gawg',
+			__( 'Draw Winner', 'gawg' ),
+			__( 'Draw Winner', 'gawg' ),
+			'manage_options',
+			'gawg-draw-winner',
+			array( __CLASS__, 'render_draw_winner_page' )
+		);
+		add_submenu_page(
+			'gawg',
 			__( 'Self Tests', 'gawg' ),
 			__( 'Self Tests', 'gawg' ),
 			'manage_options',
@@ -64,6 +75,208 @@ class GAWG_Admin {
 			'gawg-help',
 			array( __CLASS__, 'render_help_page' )
 		);
+	}
+
+	public static function enqueue_draw_winner_scripts( $hook ) {
+		if ( 'gawg_page_gawg-draw-winner' !== $hook ) {
+			return;
+		}
+		wp_enqueue_script(
+			'gawg-draw-winner',
+			GAWG_PLUGIN_URL . 'assets/js/gawg-draw-winner.js',
+			array(),
+			GAWG_VERSION,
+			true
+		);
+		wp_localize_script(
+			'gawg-draw-winner',
+			'gawgDrawWinner',
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'gawg_draw_winner' ),
+				'i18n'    => array(
+					'loading'        => __( 'Loading participants…', 'gawg' ),
+					'noParticipants' => __( 'No participants found for this giveaway.', 'gawg' ),
+					'shuffling'      => __( 'Shuffling…', 'gawg' ),
+					'networkError'   => __( 'A network error occurred. Please try again.', 'gawg' ),
+					'selectGiveaway' => __( 'Please select a giveaway.', 'gawg' ),
+				),
+			)
+		);
+	}
+
+	public static function render_draw_winner_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'gawg' ) );
+		}
+
+		$giveaways = get_terms( array(
+			'taxonomy'   => GAWG_Giveaway::TAXONOMY,
+			'hide_empty' => false,
+		) );
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Draw Winner', 'gawg' ); ?></h1>
+
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row">
+						<label for="gawg-giveaway-select"><?php esc_html_e( 'Giveaway', 'gawg' ); ?></label>
+					</th>
+					<td>
+						<select id="gawg-giveaway-select">
+							<option value=""><?php esc_html_e( '— Select a giveaway —', 'gawg' ); ?></option>
+							<?php if ( ! is_wp_error( $giveaways ) ) : ?>
+								<?php foreach ( $giveaways as $term ) : ?>
+									<option value="<?php echo esc_attr( $term->term_id ); ?>">
+										<?php echo esc_html( $term->name ); ?>
+									</option>
+								<?php endforeach; ?>
+							<?php endif; ?>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">
+						<label for="gawg-shuffle-count"><?php esc_html_e( 'Shuffle count', 'gawg' ); ?></label>
+					</th>
+					<td>
+						<input type="number" id="gawg-shuffle-count" value="10" min="1" max="100" style="width:80px;">
+						<p class="description"><?php esc_html_e( 'How many times to cycle through the list.', 'gawg' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row">
+						<label for="gawg-shuffle-delay"><?php esc_html_e( 'Delay (ms)', 'gawg' ); ?></label>
+					</th>
+					<td>
+						<input type="number" id="gawg-shuffle-delay" value="100" min="50" max="2000" style="width:80px;">
+						<p class="description"><?php esc_html_e( 'Milliseconds between each shuffle step.', 'gawg' ); ?></p>
+					</td>
+				</tr>
+			</table>
+
+			<p>
+				<button id="gawg-shuffle-btn" class="button button-primary" disabled>
+					<?php esc_html_e( 'Shuffle & Pick Winner', 'gawg' ); ?>
+				</button>
+			</p>
+
+			<div id="gawg-participants-wrap" style="display:none;margin-top:20px;">
+				<h2><?php esc_html_e( 'Participants', 'gawg' ); ?></h2>
+				<div id="gawg-highlighted-participant" style="font-size:24px;font-weight:bold;font-family:monospace;margin:10px 0;min-height:30px;"></div>
+				<ul id="gawg-participants-list" style="max-height:300px;overflow-y:auto;font-family:monospace;background:#f8f8f8;padding:10px;border:1px solid #ddd;list-style:none;margin:0;"></ul>
+			</div>
+
+			<div id="gawg-winner-wrap" style="display:none;margin-top:20px;">
+				<h2><?php esc_html_e( 'Winner', 'gawg' ); ?></h2>
+				<div id="gawg-winner-display" style="font-size:32px;font-weight:bold;font-family:monospace;color:#2271b1;"></div>
+			</div>
+
+			<div id="gawg-status" style="margin-top:10px;color:#666;"></div>
+		</div>
+		<?php
+	}
+
+	public static function ajax_load_participants() {
+		check_ajax_referer( 'gawg_draw_winner', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Unauthorized', 403 );
+		}
+
+		$term_id = isset( $_POST['term_id'] ) ? absint( $_POST['term_id'] ) : 0;
+		if ( 0 === $term_id ) {
+			wp_send_json_error( 'Invalid giveaway.' );
+		}
+
+		$term = get_term( $term_id, GAWG_Giveaway::TAXONOMY );
+		if ( is_wp_error( $term ) || null === $term ) {
+			wp_send_json_error( 'Giveaway not found.' );
+		}
+
+		$posts = get_posts( array(
+			'post_type'      => GAWG_Participant::POST_TYPE,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'tax_query'      => array(
+				array(
+					'taxonomy' => GAWG_Giveaway::TAXONOMY,
+					'field'    => 'term_id',
+					'terms'    => $term_id,
+				),
+			),
+		) );
+
+		$participants = array();
+		foreach ( $posts as $post ) {
+			$participants[] = array(
+				'id'    => $post->ID,
+				'email' => self::mask_email( $post->post_title ),
+			);
+		}
+
+		wp_send_json_success( $participants );
+	}
+
+	public static function ajax_pick_winner() {
+		check_ajax_referer( 'gawg_draw_winner', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( 'Unauthorized', 403 );
+		}
+
+		$term_id = isset( $_POST['term_id'] ) ? absint( $_POST['term_id'] ) : 0;
+		if ( 0 === $term_id ) {
+			wp_send_json_error( 'Invalid giveaway.' );
+		}
+
+		$term = get_term( $term_id, GAWG_Giveaway::TAXONOMY );
+		if ( is_wp_error( $term ) || null === $term ) {
+			wp_send_json_error( 'Giveaway not found.' );
+		}
+
+		$post_ids = get_posts( array(
+			'post_type'      => GAWG_Participant::POST_TYPE,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'tax_query'      => array(
+				array(
+					'taxonomy' => GAWG_Giveaway::TAXONOMY,
+					'field'    => 'term_id',
+					'terms'    => $term_id,
+				),
+			),
+			'fields'         => 'ids',
+		) );
+
+		if ( empty( $post_ids ) ) {
+			wp_send_json_error( 'No participants found.' );
+		}
+
+		$winner_id = $post_ids[ array_rand( $post_ids ) ];
+		update_term_meta( $term_id, GAWG_Giveaway::META_WINNER, $winner_id );
+
+		$winner_post  = get_post( $winner_id );
+		$winner_email = $winner_post ? self::mask_email( $winner_post->post_title ) : '';
+
+		wp_send_json_success( array(
+			'winner_id'    => $winner_id,
+			'winner_email' => $winner_email,
+		) );
+	}
+
+	private static function mask_email( $email ) {
+		$parts = explode( '@', $email, 2 );
+		if ( 2 !== count( $parts ) ) {
+			return $email;
+		}
+		$local  = $parts[0];
+		$domain = $parts[1];
+		if ( strlen( $local ) <= 1 ) {
+			return $local . '****@' . $domain;
+		}
+		return $local[0] . '****' . $local[ strlen( $local ) - 1 ] . '@' . $domain;
 	}
 
 	public static function render_self_tests_page() {
@@ -306,6 +519,29 @@ class GAWG_Admin {
 				<li><strong>success_message</strong> — <?php esc_html_e( '(optional) HTML shown after a successful submission. Defaults to a translatable thank-you message.', 'gawg' ); ?></li>
 			</ul>
 			<p><?php esc_html_e( 'If the same email address is submitted for the same giveaway more than once, the form displays "You are already in the list of participants" and no duplicate entry is created.', 'gawg' ); ?></p>
+
+			<h2><?php esc_html_e( 'Drawing a Winner', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'Once participants have entered, use the Draw Winner page to run the lottery.', 'gawg' ); ?>
+			</p>
+			<ol>
+				<li>
+					<?php
+					printf(
+						/* translators: %s: link to the Draw Winner admin page */
+						wp_kses(
+							__( 'Go to <a href="%s">Draw Winner</a>.', 'gawg' ),
+							array( 'a' => array( 'href' => array() ) )
+						),
+						esc_url( admin_url( 'admin.php?page=gawg-draw-winner' ) )
+					);
+					?>
+				</li>
+				<li><?php esc_html_e( 'Select the active giveaway from the dropdown. The participant list loads automatically; email addresses are masked for privacy (first character, last character, and domain are shown).', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'Set the Shuffle count (how many animation steps to run) and the Delay in milliseconds between steps.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'Click Shuffle & Pick Winner. The list animates through random participants, then a winner is chosen server-side and their masked email is displayed.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'The winner is saved automatically to the giveaway and can be seen as a read-only field on the giveaway\'s edit screen (GAWG → Giveaways).', 'gawg' ); ?></li>
+			</ol>
 
 			<h2><?php esc_html_e( 'Settings', 'gawg' ); ?></h2>
 			<p>
