@@ -559,6 +559,17 @@ class GAWG_Admin {
 				<li><?php esc_html_e( 'The winner is saved automatically to the giveaway and can be seen as a read-only field on the giveaway\'s edit screen (GAWG → Giveaways).', 'gawg' ); ?></li>
 			</ol>
 
+			<h2><?php esc_html_e( 'Managing Giveaway Status', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'Each giveaway has a status that controls whether participants can submit the entry form. The status is shown as a badge in the Giveaways list and the list can be sorted by status.', 'gawg' ); ?>
+			</p>
+			<ul>
+				<li><strong><?php esc_html_e( 'Active', 'gawg' ); ?></strong> — <?php esc_html_e( 'The giveaway is open; participants can submit the entry form.', 'gawg' ); ?></li>
+				<li><strong><?php esc_html_e( 'Closed', 'gawg' ); ?></strong> — <?php esc_html_e( 'Entry has been manually closed; the form shows a "Sorry, this giveaway is closed" message instead, and new submissions are rejected.', 'gawg' ); ?></li>
+				<li><strong><?php esc_html_e( 'Winner Drawn', 'gawg' ); ?></strong> — <?php esc_html_e( 'A winner has been selected via Draw Winner; the form automatically shows the closed message and new submissions are rejected.', 'gawg' ); ?></li>
+			</ul>
+			<p><?php esc_html_e( 'To close a giveaway manually, edit the giveaway term (GAWG → Giveaways → click the giveaway name) and check the "Closed for Participants" checkbox, then click Update.', 'gawg' ); ?></p>
+
 			<h2><?php esc_html_e( 'Settings', 'gawg' ); ?></h2>
 			<p>
 				<?php esc_html_e( 'The Settings page (GAWG → Settings) contains plugin-wide configuration options.', 'gawg' ); ?>
