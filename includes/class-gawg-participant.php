@@ -3,10 +3,12 @@ defined( 'ABSPATH' ) || exit;
 
 class GAWG_Participant {
 
-	const POST_TYPE           = 'gawg_participant';
-	const META_UUID           = '_gawg_uuid';
-	const META_ENTRIES_PREFIX = 'gawg_entries_';
-	const META_VISIT_PREFIX   = 'gawg_visit_';
+	const POST_TYPE                  = 'gawg_participant';
+	const META_UUID                  = '_gawg_uuid';
+	const META_ENTRIES_PREFIX        = 'gawg_entries_';
+	const META_VISIT_PREFIX          = 'gawg_visit_';
+	const META_VERIFIED              = '_gawg_verified';
+	const META_VERIFICATION_SENT_AT  = '_gawg_verification_sent_at';
 
 	public static function init() {
 		add_action( 'init',       array( __CLASS__, 'register_post_type' ) );
@@ -65,6 +67,34 @@ class GAWG_Participant {
 				'single'            => true,
 				'default'           => '',
 				'sanitize_callback' => 'sanitize_text_field',
+				'auth_callback'     => function() {
+					return current_user_can( 'manage_options' );
+				},
+			)
+		);
+		register_post_meta(
+			self::POST_TYPE,
+			self::META_VERIFIED,
+			array(
+				'type'              => 'string',
+				'single'            => true,
+				'default'           => '0',
+				'sanitize_callback' => function( $value ) {
+					return '1' === $value ? '1' : '0';
+				},
+				'auth_callback'     => function() {
+					return current_user_can( 'manage_options' );
+				},
+			)
+		);
+		register_post_meta(
+			self::POST_TYPE,
+			self::META_VERIFICATION_SENT_AT,
+			array(
+				'type'              => 'integer',
+				'single'            => true,
+				'default'           => 0,
+				'sanitize_callback' => 'absint',
 				'auth_callback'     => function() {
 					return current_user_can( 'manage_options' );
 				},

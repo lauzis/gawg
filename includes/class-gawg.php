@@ -10,5 +10,6 @@ class GAWG {
 		GAWG_Settings::init();
 		GAWG_Form::init();
 		GAWG_Block::init();
+		GAWG_Verification::init();
 	}
 }
