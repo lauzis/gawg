@@ -3,11 +3,13 @@ defined( 'ABSPATH' ) || exit;
 
 class GAWG_Giveaway {
 
-	const TAXONOMY       = 'gawg_giveaway';
-	const META_UUID      = '_gawg_uuid';
-	const META_WINNER    = '_gawg_winner';
-	const META_CLOSED    = '_gawg_closed';
-	const META_RULES_URL = '_gawg_rules_url';
+	const TAXONOMY        = 'gawg_giveaway';
+	const META_UUID       = '_gawg_uuid';
+	const META_WINNER     = '_gawg_winner';
+	const META_CLOSED     = '_gawg_closed';
+	const META_RULES_URL  = '_gawg_rules_url';
+	const META_REG_START  = '_gawg_reg_start';
+	const META_REG_END    = '_gawg_reg_end';
 
 	public static function init() {
 		add_action( 'init', array( __CLASS__, 'register_taxonomy' ) );
@@ -16,9 +18,11 @@ class GAWG_Giveaway {
 		add_action( 'edited_' . self::TAXONOMY,  array( __CLASS__, 'maybe_generate_uuid' ) );
 		add_action( 'edited_' . self::TAXONOMY,  array( __CLASS__, 'save_closed_meta' ) );
 		add_action( 'edited_' . self::TAXONOMY,  array( __CLASS__, 'save_rules_url_meta' ) );
+		add_action( 'edited_' . self::TAXONOMY,  array( __CLASS__, 'save_registration_dates_meta' ) );
 		add_action( self::TAXONOMY . '_add_form_fields',  array( __CLASS__, 'render_uuid_field_new' ) );
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_uuid_field_edit' ) );
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_rules_url_field_edit' ) );
+		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_registration_dates_field_edit' ) );
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_winner_field_edit' ) );
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_closed_field_edit' ) );
 		add_filter( 'manage_edit-' . self::TAXONOMY . '_columns',          array( __CLASS__, 'add_status_column' ) );
@@ -115,6 +119,32 @@ class GAWG_Giveaway {
 				},
 			)
 		);
+		register_term_meta(
+			self::TAXONOMY,
+			self::META_REG_START,
+			array(
+				'type'              => 'string',
+				'single'            => true,
+				'default'           => '',
+				'sanitize_callback' => 'sanitize_text_field',
+				'auth_callback'     => function() {
+					return current_user_can( 'manage_options' );
+				},
+			)
+		);
+		register_term_meta(
+			self::TAXONOMY,
+			self::META_REG_END,
+			array(
+				'type'              => 'string',
+				'single'            => true,
+				'default'           => '',
+				'sanitize_callback' => 'sanitize_text_field',
+				'auth_callback'     => function() {
+					return current_user_can( 'manage_options' );
+				},
+			)
+		);
 	}
 
 	public static function maybe_generate_uuid( $term_id ) {
@@ -171,6 +201,51 @@ class GAWG_Giveaway {
 		}
 		$url = isset( $_POST['gawg_rules_url'] ) ? esc_url_raw( wp_unslash( $_POST['gawg_rules_url'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce already verified by WP before edited_ fires
 		update_term_meta( $term_id, self::META_RULES_URL, $url );
+	}
+
+	public static function save_registration_dates_meta( $term_id ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$start = isset( $_POST['gawg_reg_start'] ) ? sanitize_text_field( wp_unslash( $_POST['gawg_reg_start'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$end   = isset( $_POST['gawg_reg_end'] )   ? sanitize_text_field( wp_unslash( $_POST['gawg_reg_end'] ) )   : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+		update_term_meta( $term_id, self::META_REG_START, $start );
+		update_term_meta( $term_id, self::META_REG_END,   $end );
+	}
+
+	public static function render_registration_dates_field_edit( $term ) {
+		$reg_start = (string) get_term_meta( $term->term_id, self::META_REG_START, true );
+		$reg_end   = (string) get_term_meta( $term->term_id, self::META_REG_END,   true );
+		?>
+		<tr class="form-field">
+			<th scope="row">
+				<label for="gawg-reg-start"><?php esc_html_e( 'Registration Opens', 'gawg' ); ?></label>
+			</th>
+			<td>
+				<input
+					type="datetime-local"
+					id="gawg-reg-start"
+					name="gawg_reg_start"
+					value="<?php echo esc_attr( $reg_start ); ?>"
+				/>
+				<p class="description"><?php esc_html_e( 'Leave empty to allow registration immediately. Uses the site\'s local timezone.', 'gawg' ); ?></p>
+			</td>
+		</tr>
+		<tr class="form-field">
+			<th scope="row">
+				<label for="gawg-reg-end"><?php esc_html_e( 'Registration Closes', 'gawg' ); ?></label>
+			</th>
+			<td>
+				<input
+					type="datetime-local"
+					id="gawg-reg-end"
+					name="gawg_reg_end"
+					value="<?php echo esc_attr( $reg_end ); ?>"
+				/>
+				<p class="description"><?php esc_html_e( 'Leave empty to keep registration open indefinitely. Uses the site\'s local timezone.', 'gawg' ); ?></p>
+			</td>
+		</tr>
+		<?php
 	}
 
 	public static function render_rules_url_field_edit( $term ) {

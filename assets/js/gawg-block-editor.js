@@ -56,6 +56,22 @@
 							setAttributes( { rules_url: val, rules_post_id: 0 } );
 						},
 						help: __( 'URL to the giveaway rules page. Leave empty to omit the rules checkbox.', 'gawg' ),
+					} ),
+					el( TextControl, {
+						label: __( '"Not open yet" message', 'gawg' ),
+						value: attributes.notOpenMessage,
+						onChange: function ( val ) {
+							setAttributes( { notOpenMessage: val } );
+						},
+						help: __( 'Shown when registration has not started. Leave empty for the default message.', 'gawg' ),
+					} ),
+					el( TextControl, {
+						label: __( '"Registration closed" message', 'gawg' ),
+						value: attributes.closedMessage,
+						onChange: function ( val ) {
+							setAttributes( { closedMessage: val } );
+						},
+						help: __( 'Shown when registration has ended. Leave empty for the default message.', 'gawg' ),
 					} )
 				)
 			);
