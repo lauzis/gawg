@@ -569,6 +569,8 @@ class GAWG_Admin {
 				<li><strong>rules_url</strong> — <?php esc_html_e( '(optional) Full URL to the giveaway rules page. When provided, a required checkbox is shown.', 'gawg' ); ?></li>
 				<li><strong>rules_post_id</strong> — <?php esc_html_e( '(optional) Post ID of a rules page — an alternative to rules_url.', 'gawg' ); ?></li>
 				<li><strong>success_message</strong> — <?php esc_html_e( '(optional) HTML shown after a successful submission. Defaults to a translatable thank-you message.', 'gawg' ); ?></li>
+				<li><strong>not_open_message</strong> — <?php esc_html_e( '(optional) Message shown when registration has not started yet (before the Registration Opens date). Defaults to "Registration is not open yet."', 'gawg' ); ?></li>
+				<li><strong>closed_message</strong> — <?php esc_html_e( '(optional) Message shown when registration has ended (after the Registration Closes date). Defaults to "Registration is closed."', 'gawg' ); ?></li>
 			</ul>
 			<p><?php esc_html_e( 'If the same email address is submitted for the same giveaway more than once, the form displays "You are already in the list of participants" and no duplicate entry is created.', 'gawg' ); ?></p>
 
@@ -642,6 +644,19 @@ class GAWG_Admin {
 				<li><strong><?php esc_html_e( 'Winner Drawn', 'gawg' ); ?></strong> — <?php esc_html_e( 'A winner has been selected via Draw Winner; the form automatically shows the closed message and new submissions are rejected.', 'gawg' ); ?></li>
 			</ul>
 			<p><?php esc_html_e( 'To close a giveaway manually, edit the giveaway term (GAWG → Giveaways → click the giveaway name) and check the "Closed for Participants" checkbox, then click Update.', 'gawg' ); ?></p>
+
+			<h2><?php esc_html_e( 'Registration Date Window', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'Each giveaway can have optional Registration Opens and Registration Closes dates that automatically gate when participants can register — no manual checkbox toggling needed.', 'gawg' ); ?>
+			</p>
+			<p>
+				<?php esc_html_e( 'Set these on the giveaway\'s edit screen (GAWG → Giveaways → click the giveaway name). Both fields accept a date and time in the site\'s local timezone.', 'gawg' ); ?>
+			</p>
+			<ul>
+				<li><strong><?php esc_html_e( 'Registration Opens', 'gawg' ); ?></strong> — <?php esc_html_e( 'Before this date/time the form shows "Registration is not open yet." and new submissions are rejected. Leave empty to open registration immediately.', 'gawg' ); ?></li>
+				<li><strong><?php esc_html_e( 'Registration Closes', 'gawg' ); ?></strong> — <?php esc_html_e( 'After this date/time the form shows "Registration is closed." and new submissions are rejected. Leave empty to keep registration open indefinitely.', 'gawg' ); ?></li>
+			</ul>
+			<p><?php esc_html_e( 'The default messages can be overridden per-placement using the not_open_message and closed_message shortcode attributes, or the matching text fields in the Giveaway Form block\'s Inspector Controls.', 'gawg' ); ?></p>
 
 			<h2><?php esc_html_e( 'Settings', 'gawg' ); ?></h2>
 			<p>

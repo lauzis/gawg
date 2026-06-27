@@ -21,6 +21,14 @@
 		"rules_post_id": {
 			"type": "integer",
 			"default": 0
+		},
+		"notOpenMessage": {
+			"type": "string",
+			"default": ""
+		},
+		"closedMessage": {
+			"type": "string",
+			"default": ""
 		}
 	}
 }

@@ -40,10 +40,12 @@ class GAWG_Form {
 	public static function render_shortcode( $atts ) {
 		$atts = shortcode_atts(
 			array(
-				'uuid'            => '',
-				'rules_url'       => '',
-				'rules_post_id'   => '',
-				'success_message' => '',
+				'uuid'             => '',
+				'rules_url'        => '',
+				'rules_post_id'    => '',
+				'success_message'  => '',
+				'not_open_message' => '',
+				'closed_message'   => '',
 			),
 			$atts,
 			'gawg_form'
@@ -60,6 +62,31 @@ class GAWG_Form {
 			$is_closed  = '1' === get_term_meta( $giveaway_term->term_id, GAWG_Giveaway::META_CLOSED, true );
 			if ( $has_winner || $is_closed ) {
 				return '<p class="gawg-closed-message">' . esc_html__( 'Sorry, this giveaway is closed.', 'gawg' ) . '</p>';
+			}
+
+			$timezone  = wp_timezone();
+			$now_utc   = time();
+			$reg_start = (string) get_term_meta( $giveaway_term->term_id, GAWG_Giveaway::META_REG_START, true );
+			$reg_end   = (string) get_term_meta( $giveaway_term->term_id, GAWG_Giveaway::META_REG_END, true );
+
+			if ( '' !== $reg_start ) {
+				$start_dt = DateTime::createFromFormat( 'Y-m-d\TH:i', $reg_start, $timezone );
+				if ( $start_dt && $now_utc < $start_dt->getTimestamp() ) {
+					$msg = '' !== $atts['not_open_message']
+						? wp_kses_post( $atts['not_open_message'] )
+						: esc_html__( 'Registration is not open yet.', 'gawg' );
+					return '<p class="gawg-not-open-message">' . $msg . '</p>';
+				}
+			}
+
+			if ( '' !== $reg_end ) {
+				$end_dt = DateTime::createFromFormat( 'Y-m-d\TH:i', $reg_end, $timezone );
+				if ( $end_dt && $now_utc > $end_dt->getTimestamp() ) {
+					$msg = '' !== $atts['closed_message']
+						? wp_kses_post( $atts['closed_message'] )
+						: esc_html__( 'Registration is closed.', 'gawg' );
+					return '<p class="gawg-registration-closed-message">' . $msg . '</p>';
+				}
 			}
 		}
 
@@ -188,6 +215,25 @@ class GAWG_Form {
 		$is_closed  = '1' === get_term_meta( $term->term_id, GAWG_Giveaway::META_CLOSED, true );
 		if ( $has_winner || $is_closed ) {
 			wp_send_json_error( array( 'message' => __( 'Sorry, this giveaway is closed.', 'gawg' ) ) );
+		}
+
+		$timezone  = wp_timezone();
+		$now_utc   = time();
+		$reg_start = (string) get_term_meta( $term->term_id, GAWG_Giveaway::META_REG_START, true );
+		$reg_end   = (string) get_term_meta( $term->term_id, GAWG_Giveaway::META_REG_END, true );
+
+		if ( '' !== $reg_start ) {
+			$start_dt = DateTime::createFromFormat( 'Y-m-d\TH:i', $reg_start, $timezone );
+			if ( $start_dt && $now_utc < $start_dt->getTimestamp() ) {
+				wp_send_json_error( array( 'message' => __( 'Registration is not open yet.', 'gawg' ) ) );
+			}
+		}
+
+		if ( '' !== $reg_end ) {
+			$end_dt = DateTime::createFromFormat( 'Y-m-d\TH:i', $reg_end, $timezone );
+			if ( $end_dt && $now_utc > $end_dt->getTimestamp() ) {
+				wp_send_json_error( array( 'message' => __( 'Registration is closed.', 'gawg' ) ) );
+			}
 		}
 
 		if ( self::participant_exists( $email, $term->term_id ) ) {

@@ -30,14 +30,22 @@ class GAWG_Block {
 			return '';
 		}
 
-		$rules_url     = isset( $attributes['rules_url'] )     ? esc_url_raw( $attributes['rules_url'] )  : '';
-		$rules_post_id = isset( $attributes['rules_post_id'] ) ? (int) $attributes['rules_post_id']        : 0;
+		$rules_url        = isset( $attributes['rules_url'] )       ? esc_url_raw( $attributes['rules_url'] )             : '';
+		$rules_post_id    = isset( $attributes['rules_post_id'] )   ? (int) $attributes['rules_post_id']                   : 0;
+		$not_open_message = isset( $attributes['notOpenMessage'] )  ? sanitize_text_field( $attributes['notOpenMessage'] ) : '';
+		$closed_message   = isset( $attributes['closedMessage'] )   ? sanitize_text_field( $attributes['closedMessage'] )  : '';
 
 		$shortcode = '[gawg_form uuid="' . esc_attr( $uuid ) . '"';
 		if ( '' !== $rules_url ) {
 			$shortcode .= ' rules_url="' . esc_attr( $rules_url ) . '"';
 		} elseif ( $rules_post_id > 0 ) {
 			$shortcode .= ' rules_post_id="' . $rules_post_id . '"';
+		}
+		if ( '' !== $not_open_message ) {
+			$shortcode .= ' not_open_message="' . esc_attr( $not_open_message ) . '"';
+		}
+		if ( '' !== $closed_message ) {
+			$shortcode .= ' closed_message="' . esc_attr( $closed_message ) . '"';
 		}
 		$shortcode .= ']';
 
