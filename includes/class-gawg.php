@@ -11,5 +11,6 @@ class GAWG {
 		GAWG_Form::init();
 		GAWG_Block::init();
 		GAWG_Verification::init();
+		GAWG_Extra_Entries::init();
 	}
 }

@@ -768,6 +768,66 @@ class GAWG_Admin {
 				?>
 			</p>
 
+			<h2><?php esc_html_e( 'Custom Extra Entries Hook', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'The gawg_add_extra_entries action hook lets any third-party plugin (e.g. Gravity Forms, WooCommerce) award bonus entries to a verified participant programmatically. The hook only acts on participants who have completed email verification — unverified participants are silently ignored.', 'gawg' ); ?>
+			</p>
+			<h3><?php esc_html_e( 'Basic usage', 'gawg' ); ?></h3>
+			<pre><code>do_action( 'gawg_add_extra_entries', array(
+    'participant_email' => 'user@example.com', // or 'participant_uuid' => '...'
+    'action_id'         => 'gravity_form_quiz',
+    'message'           => 'Completed the quiz',
+) );</code></pre>
+			<h3><?php esc_html_e( 'All parameters', 'gawg' ); ?></h3>
+			<ul>
+				<li>
+					<strong>participant_uuid</strong> / <strong>participant_email</strong> —
+					<?php esc_html_e( 'One of these is required to identify the participant. UUID takes precedence if both are supplied.', 'gawg' ); ?>
+				</li>
+				<li>
+					<strong>action_id</strong> —
+					<?php esc_html_e( '(required) A unique slug identifying this type of event (e.g. "quiz_completed"). Used as part of the deduplication meta key — keep it consistent across calls for the same event type.', 'gawg' ); ?>
+				</li>
+				<li>
+					<strong>message</strong> —
+					<?php esc_html_e( '(required) A human-readable description stored in the participant\'s action history (e.g. "Completed the quiz").', 'gawg' ); ?>
+				</li>
+				<li>
+					<strong>giveaway_uuid</strong> —
+					<?php esc_html_e( '(optional) UUID of the giveaway to award entries for. When omitted, all active giveaways the participant is registered in receive the bonus.', 'gawg' ); ?>
+				</li>
+				<li>
+					<strong>entry_count</strong> —
+					<?php esc_html_e( '(optional, default 1) Number of entries to award per event.', 'gawg' ); ?>
+				</li>
+				<li>
+					<strong>unique</strong> —
+					<?php esc_html_e( '(optional, default true) When true, the bonus is awarded at most once per participant per giveaway — subsequent calls with the same action_id for the same giveaway are ignored. When false, the bonus can be awarded repeatedly until the max_entries cap is reached.', 'gawg' ); ?>
+				</li>
+				<li>
+					<strong>max_entries</strong> —
+					<?php esc_html_e( '(optional, default 10) Maximum total number of times the bonus can be awarded to a participant when unique is false. Ignored in unique mode.', 'gawg' ); ?>
+				</li>
+			</ul>
+			<h3><?php esc_html_e( 'Uniqueness behaviour', 'gawg' ); ?></h3>
+			<p>
+				<?php esc_html_e( 'When unique=true (the default), the plugin stores a flag in participant meta keyed as gawg_{giveaway_uuid}_{action_id}. If the flag is already set for a given giveaway, that giveaway is skipped. This ensures the event is awarded exactly once per participant per giveaway.', 'gawg' ); ?>
+			</p>
+			<p>
+				<?php esc_html_e( 'When unique=false, a global counter keyed as gawg_{action_id}_count tracks how many times the action has fired for that participant. If the counter has reached max_entries, the hook exits without awarding any entries.', 'gawg' ); ?>
+			</p>
+			<h3><?php esc_html_e( 'Example: Gravity Forms integration', 'gawg' ); ?></h3>
+			<pre><code>add_action( 'gform_after_submission_5', function( $entry, $form ) {
+    $email = rgar( $entry, '1' ); // field 1 = email
+    do_action( 'gawg_add_extra_entries', array(
+        'participant_email' => $email,
+        'action_id'         => 'gform_quiz_5',
+        'message'           => 'Completed the quiz (form #5)',
+        'entry_count'       => 2,
+        'unique'            => true,
+    ) );
+}, 10, 2 );</code></pre>
+
 		</div>
 		<?php
 	}
