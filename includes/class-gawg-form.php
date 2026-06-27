@@ -13,6 +13,7 @@ class GAWG_Form {
 		add_action( 'wp_enqueue_scripts', array( __CLASS__, 'register_assets' ) );
 		add_action( 'wp_ajax_' . self::AJAX_ACTION,        array( __CLASS__, 'ajax_submit' ) );
 		add_action( 'wp_ajax_nopriv_' . self::AJAX_ACTION, array( __CLASS__, 'ajax_submit' ) );
+		add_action( 'transition_post_status', array( __CLASS__, 'on_participant_publish' ), 10, 3 );
 	}
 
 	public static function register_shortcode() {
@@ -200,6 +201,9 @@ class GAWG_Form {
 		$participant_uuid = get_post_meta( $post_id, GAWG_Participant::META_UUID, true );
 		$invite_url       = '' !== $participant_uuid ? self::build_invite_url( $uuid, $participant_uuid ) : '';
 
+		// Record registration-after-visit bonus for any inviter who referred this participant.
+		self::maybe_record_invite_registration( $post_id, $uuid, $participant_uuid );
+
 		wp_send_json_success( '' !== $invite_url ? array( 'invite_url' => $invite_url ) : null );
 	}
 
@@ -237,6 +241,13 @@ class GAWG_Form {
 		}
 
 		self::process_invite( $participant->ID, $giveaway_uuid, $ip );
+
+		// Persist attribution in a cookie so registration can be linked to this invite.
+		$cookie_name = 'gawg_invite_' . str_replace( '-', '_', $giveaway_uuid );
+		if ( ! isset( $_COOKIE[ $cookie_name ] ) ) {
+			setcookie( $cookie_name, $participant_uuid, time() + 30 * DAY_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
+			$_COOKIE[ $cookie_name ] = $participant_uuid;
+		}
 	}
 
 	public static function build_invite_url( $giveaway_uuid, $participant_uuid ) {
@@ -262,10 +273,83 @@ class GAWG_Form {
 		if ( $current < 1 ) {
 			$current = 1;
 		}
-		update_post_meta( $participant_id, $entries_key, $current + 1 );
+		update_post_meta( $participant_id, $entries_key, $current + GAWG_Settings::get_extra_entries_unique_visit() );
 		update_post_meta( $participant_id, $visit_key, '1' );
 
 		return true;
+	}
+
+	private static function maybe_record_invite_registration( $invitee_post_id, $giveaway_uuid, $invitee_uuid ) {
+		if ( '' === $invitee_uuid ) {
+			return;
+		}
+		$cookie_name  = 'gawg_invite_' . str_replace( '-', '_', $giveaway_uuid );
+		$inviter_uuid = isset( $_COOKIE[ $cookie_name ] ) ? sanitize_text_field( wp_unslash( $_COOKIE[ $cookie_name ] ) ) : '';
+		if ( '' === $inviter_uuid || $inviter_uuid === $invitee_uuid ) {
+			return;
+		}
+		$inviter = self::find_participant_by_uuid( $inviter_uuid );
+		if ( null === $inviter ) {
+			return;
+		}
+		self::record_invitee_registration( $inviter->ID, $giveaway_uuid, $invitee_uuid, get_post_status( $invitee_post_id ) );
+	}
+
+	public static function record_invitee_registration( $inviter_id, $giveaway_uuid, $invitee_uuid, $invitee_status ) {
+		$meta_key = 'gawg_invitee_' . $giveaway_uuid . '_' . $invitee_uuid;
+		if ( 'registered' === get_post_meta( $inviter_id, $meta_key, true ) ) {
+			return;
+		}
+		if ( 'publish' === $invitee_status ) {
+			update_post_meta( $inviter_id, $meta_key, 'registered' );
+			$entries_key = GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid;
+			$current     = (int) get_post_meta( $inviter_id, $entries_key, true );
+			update_post_meta( $inviter_id, $entries_key, max( 1, $current ) + GAWG_Settings::get_extra_entries_registration() );
+		} else {
+			update_post_meta( $inviter_id, $meta_key, 'pending' );
+		}
+	}
+
+	public static function on_participant_publish( $new_status, $old_status, $post ) {
+		if ( 'publish' !== $new_status || 'publish' === $old_status ) {
+			return;
+		}
+		if ( GAWG_Participant::POST_TYPE !== $post->post_type ) {
+			return;
+		}
+		$invitee_uuid = get_post_meta( $post->ID, GAWG_Participant::META_UUID, true );
+		if ( '' === $invitee_uuid ) {
+			return;
+		}
+		$terms = wp_get_object_terms( $post->ID, GAWG_Giveaway::TAXONOMY );
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return;
+		}
+		foreach ( $terms as $term ) {
+			$giveaway_uuid = get_term_meta( $term->term_id, GAWG_Giveaway::META_UUID, true );
+			if ( '' === $giveaway_uuid ) {
+				continue;
+			}
+			$meta_key = 'gawg_invitee_' . $giveaway_uuid . '_' . $invitee_uuid;
+			$inviters = get_posts( array(
+				'post_type'      => GAWG_Participant::POST_TYPE,
+				'post_status'    => 'publish',
+				'posts_per_page' => -1,
+				'meta_query'     => array(
+					array(
+						'key'   => $meta_key,
+						'value' => 'pending',
+					),
+				),
+				'fields'         => 'ids',
+			) );
+			foreach ( $inviters as $inviter_id ) {
+				update_post_meta( $inviter_id, $meta_key, 'registered' );
+				$entries_key = GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid;
+				$current     = (int) get_post_meta( $inviter_id, $entries_key, true );
+				update_post_meta( $inviter_id, $entries_key, max( 1, $current ) + GAWG_Settings::get_extra_entries_registration() );
+			}
+		}
 	}
 
 	private static function get_visitor_ip() {

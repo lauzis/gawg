@@ -612,15 +612,33 @@ class GAWG_Admin {
 				<li><?php esc_html_e( 'The reCAPTCHA widget will now appear automatically in every [gawg_form] or Giveaway Form block on your site. Remove either key to disable reCAPTCHA at any time without affecting the honeypot.', 'gawg' ); ?></li>
 			</ol>
 
+			<h3><?php esc_html_e( 'Extra Entries', 'gawg' ); ?></h3>
+			<ul>
+				<li>
+					<strong><?php esc_html_e( 'Extra entries for unique visit', 'gawg' ); ?></strong> —
+					<?php esc_html_e( 'How many entries to award an inviter each time a new unique IP visits the site via their invite link. Default: 1.', 'gawg' ); ?>
+				</li>
+				<li>
+					<strong><?php esc_html_e( 'Extra entries for registration after visit', 'gawg' ); ?></strong> —
+					<?php esc_html_e( 'How many entries to award an inviter when someone they referred completes registration for the same giveaway. Default: 1.', 'gawg' ); ?>
+				</li>
+			</ul>
+
 			<h2><?php esc_html_e( 'Extra Entries via Invite Links', 'gawg' ); ?></h2>
 			<p>
-				<?php esc_html_e( 'Each participant can earn bonus entries by sharing their personal invite link. When a unique visitor clicks the link, the inviting participant\'s entry count for that giveaway increases by 1.', 'gawg' ); ?>
+				<?php esc_html_e( 'Each participant can earn bonus entries by sharing their personal invite link. Two types of bonus are available, both configurable on the Settings page.', 'gawg' ); ?>
 			</p>
-			<h3><?php esc_html_e( 'How it works', 'gawg' ); ?></h3>
+			<h3><?php esc_html_e( 'Bonus type 1: Unique visit', 'gawg' ); ?></h3>
 			<ol>
 				<li><?php esc_html_e( 'After submitting the entry form, a participant receives their personal invite link in the success message.', 'gawg' ); ?></li>
-				<li><?php esc_html_e( 'The participant shares the link with friends. Each click from a unique IP address increments their entry count by 1.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'The participant shares the link with friends. Each click from a unique IP address increments their entry count by the "Extra entries for unique visit" setting (default: 1).', 'gawg' ); ?></li>
 				<li><?php esc_html_e( 'The same IP address can only count once per invite link, so refreshing the page or multiple clicks from one location do not award extra entries.', 'gawg' ); ?></li>
+			</ol>
+			<h3><?php esc_html_e( 'Bonus type 2: Registration after visit', 'gawg' ); ?></h3>
+			<ol>
+				<li><?php esc_html_e( 'When a visitor arrives via an invite link, the plugin stores a short-lived cookie that tracks who referred them.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'If that visitor then registers for the same giveaway, the inviter is automatically awarded the "Extra entries for registration after visit" bonus (default: 1).', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'The bonus is awarded only once per referred registration, regardless of how many times the visitor clicked the invite link.', 'gawg' ); ?></li>
 			</ol>
 			<h3><?php esc_html_e( 'Invite link format', 'gawg' ); ?></h3>
 			<pre><code>/?gwag-giveaway={giveaway-uuid}&amp;invite={participant-uuid}</code></pre>
@@ -638,6 +656,7 @@ class GAWG_Admin {
 				);
 				?>
 			</p>
+
 		</div>
 		<?php
 	}
