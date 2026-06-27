@@ -18,6 +18,11 @@ class GAWG_Admin {
 		'verification_sets_verified_flag'     => 'Verification Link Sets Verified Flag',
 		'expired_verification_detected'       => 'Expired Verification Link Is Detected',
 		'already_verified_skips_reverify'     => 'Already-Verified Participant Is Not Re-Verified',
+		'history_registration_recorded'       => 'History: Registration Is Recorded',
+		'history_verification_email_recorded' => 'History: Verification Email Is Recorded',
+		'history_verified_recorded'           => 'History: Verified Action Is Recorded',
+		'history_invite_visited_recorded'     => 'History: Invite Visited Is Recorded',
+		'history_invite_registered_recorded'  => 'History: Invite Registered Is Recorded',
 	);
 
 	public static function init() {
@@ -439,6 +444,21 @@ class GAWG_Admin {
 				case 'already_verified_skips_reverify':
 					$results[] = self::test_already_verified_skips_reverify();
 					break;
+				case 'history_registration_recorded':
+					$results[] = self::test_history_registration_recorded();
+					break;
+				case 'history_verification_email_recorded':
+					$results[] = self::test_history_verification_email_recorded();
+					break;
+				case 'history_verified_recorded':
+					$results[] = self::test_history_verified_recorded();
+					break;
+				case 'history_invite_visited_recorded':
+					$results[] = self::test_history_invite_visited_recorded();
+					break;
+				case 'history_invite_registered_recorded':
+					$results[] = self::test_history_invite_registered_recorded();
+					break;
 			}
 		}
 
@@ -714,6 +734,33 @@ class GAWG_Admin {
 					/* translators: %s: link to the Participants list screen */
 					wp_kses(
 						__( 'The <a href="%s">Participants list</a> shows an Entries column with the current count per giveaway. Each participant\'s edit screen also shows an "Entries &amp; Invite Links" panel with the count and a copyable invite link for every giveaway they are enrolled in.', 'gawg' ),
+						array( 'a' => array( 'href' => array() ) )
+					),
+					esc_url( admin_url( 'edit.php?post_type=' . GAWG_Participant::POST_TYPE ) )
+				);
+				?>
+			</p>
+
+			<h2><?php esc_html_e( 'Participant Action History', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'Every significant event in a participant\'s lifecycle is automatically recorded with a UTC timestamp and stored as post meta on the participant. The full history is displayed in a read-only table at the bottom of each participant\'s edit screen under the "Action History" heading.', 'gawg' ); ?>
+			</p>
+			<p><?php esc_html_e( 'Recorded actions:', 'gawg' ); ?></p>
+			<ul>
+				<li><strong>registered</strong> — <?php esc_html_e( 'Participant submitted the entry form and their post was created.', 'gawg' ); ?></li>
+				<li><strong>verification_email_sent</strong> — <?php esc_html_e( 'A verification email was dispatched to the participant (initial send or resend).', 'gawg' ); ?></li>
+				<li><strong>success_email_sent</strong> — <?php esc_html_e( 'A success confirmation email was sent after the participant verified their address.', 'gawg' ); ?></li>
+				<li><strong>verified</strong> — <?php esc_html_e( 'Participant clicked the verification link and their email was confirmed.', 'gawg' ); ?></li>
+				<li><strong>invite_visited</strong> — <?php esc_html_e( 'A new unique IP address visited via this participant\'s invite link (bonus entry awarded).', 'gawg' ); ?></li>
+				<li><strong>invite_registered</strong> — <?php esc_html_e( 'Someone referred via this participant\'s invite link completed registration (bonus entry awarded to this participant as inviter).', 'gawg' ); ?></li>
+				<li><strong>invite_verified</strong> — <?php esc_html_e( 'Someone this participant referred has verified their email.', 'gawg' ); ?></li>
+			</ul>
+			<p>
+				<?php
+				printf(
+					/* translators: %s: link to the Participants list screen */
+					wp_kses(
+						__( 'To view a participant\'s history, open their edit screen from the <a href="%s">Participants list</a> and scroll to the bottom.', 'gawg' ),
 						array( 'a' => array( 'href' => array() ) )
 					),
 					esc_url( admin_url( 'edit.php?post_type=' . GAWG_Participant::POST_TYPE ) )
@@ -1267,6 +1314,199 @@ class GAWG_Admin {
 
 		$result['pass']    = true;
 		$result['message'] = 'Already-verified participant correctly skipped re-verification.';
+		return $result;
+	}
+
+	private static function test_history_registration_recorded() {
+		$result = array(
+			'id'      => 'history_registration_recorded',
+			'name'    => 'History: Registration Is Recorded',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id = $setup['post_id'];
+
+		GAWG_History::append( $post_id, 'registered' );
+
+		$entries = GAWG_History::get_all( $post_id );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		if ( empty( $entries ) ) {
+			$result['message'] = 'No history entries found after append.';
+			return $result;
+		}
+
+		$first = reset( $entries );
+		if ( 'registered' !== ( $first['action'] ?? '' ) ) {
+			$result['message'] = 'Expected action "registered", got "' . ( $first['action'] ?? '' ) . '".';
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'history_1 action = "registered" correctly recorded.';
+		return $result;
+	}
+
+	private static function test_history_verification_email_recorded() {
+		$result = array(
+			'id'      => 'history_verification_email_recorded',
+			'name'    => 'History: Verification Email Is Recorded',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id = $setup['post_id'];
+		$term    = get_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		add_filter( 'pre_wp_mail', '__return_true', 0 );
+		GAWG_Mailer::send_verification_email( $post_id, $term );
+		remove_filter( 'pre_wp_mail', '__return_true', 0 );
+
+		$entries = GAWG_History::get_all( $post_id );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		$actions = array_column( $entries, 'action' );
+		if ( ! in_array( 'verification_email_sent', $actions, true ) ) {
+			$result['message'] = 'Action "verification_email_sent" not found in history. Found: ' . implode( ', ', $actions );
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = '"verification_email_sent" correctly recorded in history.';
+		return $result;
+	}
+
+	private static function test_history_verified_recorded() {
+		$result = array(
+			'id'      => 'history_verified_recorded',
+			'name'    => 'History: Verified Action Is Recorded',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id = $setup['post_id'];
+		$term    = get_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		update_post_meta( $post_id, GAWG_Participant::META_VERIFICATION_SENT_AT, time() );
+
+		add_filter( 'pre_wp_mail', '__return_true', 0 );
+		$status = GAWG_Verification::process_verification( $post_id, $term );
+		remove_filter( 'pre_wp_mail', '__return_true', 0 );
+
+		$entries = GAWG_History::get_all( $post_id );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		if ( 'verified' !== $status ) {
+			$result['message'] = 'process_verification returned "' . $status . '" instead of "verified".';
+			return $result;
+		}
+
+		$actions = array_column( $entries, 'action' );
+		if ( ! in_array( 'verified', $actions, true ) ) {
+			$result['message'] = 'Action "verified" not found in history. Found: ' . implode( ', ', $actions );
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = '"verified" correctly recorded in history.';
+		return $result;
+	}
+
+	private static function test_history_invite_visited_recorded() {
+		$result = array(
+			'id'      => 'history_invite_visited_recorded',
+			'name'    => 'History: Invite Visited Is Recorded',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id       = $setup['post_id'];
+		$giveaway_uuid = $setup['giveaway_uuid'];
+
+		update_post_meta( $post_id, GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid, 1 );
+
+		GAWG_Form::process_invite( $post_id, $giveaway_uuid, '192.0.2.50' );
+
+		$entries = GAWG_History::get_all( $post_id );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		$actions = array_column( $entries, 'action' );
+		if ( ! in_array( 'invite_visited', $actions, true ) ) {
+			$result['message'] = 'Action "invite_visited" not found in history. Found: ' . implode( ', ', $actions );
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = '"invite_visited" correctly recorded in history.';
+		return $result;
+	}
+
+	private static function test_history_invite_registered_recorded() {
+		$result = array(
+			'id'      => 'history_invite_registered_recorded',
+			'name'    => 'History: Invite Registered Is Recorded',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$inviter_setup = self::make_test_participant_in_giveaway();
+		if ( isset( $inviter_setup['error'] ) ) {
+			$result['message'] = $inviter_setup['error'];
+			return $result;
+		}
+
+		$inviter_id    = $inviter_setup['post_id'];
+		$giveaway_uuid = $inviter_setup['giveaway_uuid'];
+		$invitee_uuid  = wp_generate_uuid4();
+
+		GAWG_Form::record_invitee_registration( $inviter_id, $giveaway_uuid, $invitee_uuid, 'publish' );
+
+		$entries = GAWG_History::get_all( $inviter_id );
+
+		wp_delete_post( $inviter_id, true );
+		wp_delete_term( $inviter_setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		$actions = array_column( $entries, 'action' );
+		if ( ! in_array( 'invite_registered', $actions, true ) ) {
+			$result['message'] = 'Action "invite_registered" not found in history. Found: ' . implode( ', ', $actions );
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = '"invite_registered" correctly recorded in history.';
 		return $result;
 	}
 

@@ -17,6 +17,7 @@ define( 'GAWG_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 require_once GAWG_PLUGIN_DIR . 'vendor/autoload.php';
 
+require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-history.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-participant.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-giveaway.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-admin.php';

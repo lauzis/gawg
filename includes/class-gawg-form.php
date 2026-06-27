@@ -211,6 +211,7 @@ class GAWG_Form {
 
 		// Initialise entry count to 1 for this giveaway.
 		update_post_meta( $post_id, GAWG_Participant::META_ENTRIES_PREFIX . $uuid, 1 );
+		GAWG_History::append( $post_id, 'registered' );
 
 		// Build invite URL so the participant can share it immediately.
 		$participant_uuid = get_post_meta( $post_id, GAWG_Participant::META_UUID, true );
@@ -293,6 +294,7 @@ class GAWG_Form {
 		}
 		update_post_meta( $participant_id, $entries_key, $current + GAWG_Settings::get_extra_entries_unique_visit() );
 		update_post_meta( $participant_id, $visit_key, '1' );
+		GAWG_History::append( $participant_id, 'invite_visited' );
 
 		return true;
 	}
@@ -323,6 +325,7 @@ class GAWG_Form {
 			$entries_key = GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid;
 			$current     = (int) get_post_meta( $inviter_id, $entries_key, true );
 			update_post_meta( $inviter_id, $entries_key, max( 1, $current ) + GAWG_Settings::get_extra_entries_registration() );
+			GAWG_History::append( $inviter_id, 'invite_registered' );
 		} else {
 			update_post_meta( $inviter_id, $meta_key, 'pending' );
 		}
