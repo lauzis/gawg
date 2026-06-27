@@ -114,9 +114,36 @@ class GAWG_Verification {
 		}
 
 		update_post_meta( $participant_id, GAWG_Participant::META_VERIFIED, '1' );
+		GAWG_History::append( $participant_id, 'verified' );
 		GAWG_Mailer::send_success_email( $participant_id, $giveaway_term );
 
+		self::maybe_record_invite_verified( $participant_id, $giveaway_term );
+
 		return 'verified';
+	}
+
+	private static function maybe_record_invite_verified( $participant_id, $giveaway_term ) {
+		$invitee_uuid  = (string) get_post_meta( $participant_id, GAWG_Participant::META_UUID, true );
+		$giveaway_uuid = (string) get_term_meta( $giveaway_term->term_id, GAWG_Giveaway::META_UUID, true );
+		if ( '' === $invitee_uuid || '' === $giveaway_uuid ) {
+			return;
+		}
+		$meta_key = 'gawg_invitee_' . $giveaway_uuid . '_' . $invitee_uuid;
+		$inviters = get_posts( array(
+			'post_type'      => GAWG_Participant::POST_TYPE,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'meta_query'     => array(
+				array(
+					'key'   => $meta_key,
+					'value' => 'registered',
+				),
+			),
+			'fields'         => 'ids',
+		) );
+		foreach ( $inviters as $inviter_id ) {
+			GAWG_History::append( $inviter_id, 'invite_verified' );
+		}
 	}
 
 	private static function die_success( $message ) {

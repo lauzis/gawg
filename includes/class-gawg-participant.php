@@ -16,6 +16,7 @@ class GAWG_Participant {
 		add_action( 'save_post_' . self::POST_TYPE, array( __CLASS__, 'maybe_generate_uuid' ), 10, 2 );
 		add_action( 'add_meta_boxes', array( __CLASS__, 'add_uuid_meta_box' ) );
 		add_action( 'add_meta_boxes', array( __CLASS__, 'add_entries_meta_box' ) );
+		add_action( 'add_meta_boxes', array( __CLASS__, 'add_history_meta_box' ) );
 		add_filter( 'manage_' . self::POST_TYPE . '_posts_columns',       array( __CLASS__, 'add_entries_column' ) );
 		add_action( 'manage_' . self::POST_TYPE . '_posts_custom_column', array( __CLASS__, 'render_entries_column' ), 10, 2 );
 	}
@@ -181,6 +182,17 @@ class GAWG_Participant {
 				echo '<input type="text" readonly value="' . esc_attr( $invite_url ) . '" style="width:100%;font-family:monospace;font-size:11px;" onclick="this.select();"></p>';
 			}
 		}
+	}
+
+	public static function add_history_meta_box() {
+		add_meta_box(
+			'gawg_participant_history',
+			__( 'Action History', 'gawg' ),
+			array( 'GAWG_History', 'render_meta_box' ),
+			self::POST_TYPE,
+			'normal',
+			'low'
+		);
 	}
 
 	public static function add_entries_column( $columns ) {

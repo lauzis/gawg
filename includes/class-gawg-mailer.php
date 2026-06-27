@@ -36,7 +36,9 @@ class GAWG_Mailer {
 		/* translators: %s: giveaway title */
 		$subject = sprintf( __( 'Please verify your email for %s', 'gawg' ), $giveaway_title );
 
-		return wp_mail( $email, $subject, $body, array( 'Content-Type: text/html; charset=UTF-8' ) );
+		$sent = wp_mail( $email, $subject, $body, array( 'Content-Type: text/html; charset=UTF-8' ) );
+		GAWG_History::append( $participant_id, 'verification_email_sent' );
+		return $sent;
 	}
 
 	public static function send_success_email( $participant_id, $giveaway_term ) {
@@ -61,7 +63,9 @@ class GAWG_Mailer {
 		/* translators: %s: giveaway title */
 		$subject = sprintf( __( 'You are registered for %s', 'gawg' ), $giveaway_title );
 
-		return wp_mail( $email, $subject, $body, array( 'Content-Type: text/html; charset=UTF-8' ) );
+		$sent = wp_mail( $email, $subject, $body, array( 'Content-Type: text/html; charset=UTF-8' ) );
+		GAWG_History::append( $participant_id, 'success_email_sent' );
+		return $sent;
 	}
 
 	private static function interpolate( $template, array $placeholders ) {
