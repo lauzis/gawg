@@ -54,6 +54,15 @@ class GAWG_Form {
 			return '';
 		}
 
+		$giveaway_term = self::find_term_by_uuid( $uuid );
+		if ( null !== $giveaway_term ) {
+			$has_winner = (int) get_term_meta( $giveaway_term->term_id, GAWG_Giveaway::META_WINNER, true ) > 0;
+			$is_closed  = '1' === get_term_meta( $giveaway_term->term_id, GAWG_Giveaway::META_CLOSED, true );
+			if ( $has_winner || $is_closed ) {
+				return '<p class="gawg-closed-message">' . esc_html__( 'Sorry, this giveaway is closed.', 'gawg' ) . '</p>';
+			}
+		}
+
 		$rules_url = '';
 		if ( '' !== $atts['rules_url'] ) {
 			$rules_url = esc_url_raw( $atts['rules_url'] );
@@ -173,6 +182,12 @@ class GAWG_Form {
 		$term = self::find_term_by_uuid( $uuid );
 		if ( null === $term ) {
 			wp_send_json_error( array( 'message' => __( 'Giveaway not found.', 'gawg' ) ) );
+		}
+
+		$has_winner = (int) get_term_meta( $term->term_id, GAWG_Giveaway::META_WINNER, true ) > 0;
+		$is_closed  = '1' === get_term_meta( $term->term_id, GAWG_Giveaway::META_CLOSED, true );
+		if ( $has_winner || $is_closed ) {
+			wp_send_json_error( array( 'message' => __( 'Sorry, this giveaway is closed.', 'gawg' ) ) );
 		}
 
 		if ( self::participant_exists( $email, $term->term_id ) ) {
