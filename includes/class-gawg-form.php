@@ -219,6 +219,9 @@ class GAWG_Form {
 		// Record registration-after-visit bonus for any inviter who referred this participant.
 		self::maybe_record_invite_registration( $post_id, $uuid, $participant_uuid );
 
+		// Send verification email; participant must confirm their address before being considered active.
+		GAWG_Mailer::send_verification_email( $post_id, $term );
+
 		wp_send_json_success( '' !== $invite_url ? array( 'invite_url' => $invite_url ) : null );
 	}
 

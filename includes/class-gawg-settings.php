@@ -28,6 +28,11 @@ class GAWG_Settings {
 					->set_attribute( 'type', 'number' )
 					->set_attribute( 'min', '0' )
 					->set_help_text( __( 'Entries awarded to an inviter when a visitor they referred completes registration. Default: 1.', 'gawg' ) ),
+				Field::make( 'separator', 'gawg_email_templates_separator', __( 'Email Templates', 'gawg' ) ),
+				Field::make( 'textarea', 'gawg_email_verification', __( 'Verification Email Template (HTML)', 'gawg' ) )
+					->set_help_text( __( 'Sent when a new participant registers and must verify their email. Available placeholders: {participant_email}, {giveaway_title}, {verification_link}', 'gawg' ) ),
+				Field::make( 'textarea', 'gawg_email_success', __( 'Registration Success Email Template (HTML)', 'gawg' ) )
+					->set_help_text( __( 'Sent after a participant successfully verifies their email. Available placeholders: {participant_email}, {giveaway_title}, {rules_url}', 'gawg' ) ),
 			) );
 	}
 
@@ -51,5 +56,13 @@ class GAWG_Settings {
 	public static function get_extra_entries_registration() {
 		$val = (int) carbon_get_theme_option( 'gawg_extra_entries_registration' );
 		return $val > 0 ? $val : 1;
+	}
+
+	public static function get_email_verification_template() {
+		return wp_kses_post( (string) carbon_get_theme_option( 'gawg_email_verification' ) );
+	}
+
+	public static function get_email_success_template() {
+		return wp_kses_post( (string) carbon_get_theme_option( 'gawg_email_success' ) );
 	}
 }

@@ -14,6 +14,10 @@ class GAWG_Admin {
 		'invite_url_format'                   => 'Invite URL Contains Correct Query Params',
 		'new_ip_increments_entries'           => 'New IP Increments Entry Count',
 		'duplicate_ip_no_increment'           => 'Duplicate IP Does Not Double-Increment Entries',
+		'verification_sent_at_set'            => 'Verification Email Sets Sent-At Timestamp',
+		'verification_sets_verified_flag'     => 'Verification Link Sets Verified Flag',
+		'expired_verification_detected'       => 'Expired Verification Link Is Detected',
+		'already_verified_skips_reverify'     => 'Already-Verified Participant Is Not Re-Verified',
 	);
 
 	public static function init() {
@@ -423,6 +427,18 @@ class GAWG_Admin {
 				case 'duplicate_ip_no_increment':
 					$results[] = self::test_duplicate_ip_no_increment();
 					break;
+				case 'verification_sent_at_set':
+					$results[] = self::test_verification_sent_at_set();
+					break;
+				case 'verification_sets_verified_flag':
+					$results[] = self::test_verification_sets_verified_flag();
+					break;
+				case 'expired_verification_detected':
+					$results[] = self::test_expired_verification_detected();
+					break;
+				case 'already_verified_skips_reverify':
+					$results[] = self::test_already_verified_skips_reverify();
+					break;
 			}
 		}
 
@@ -535,6 +551,43 @@ class GAWG_Admin {
 				<li><strong>success_message</strong> — <?php esc_html_e( '(optional) HTML shown after a successful submission. Defaults to a translatable thank-you message.', 'gawg' ); ?></li>
 			</ul>
 			<p><?php esc_html_e( 'If the same email address is submitted for the same giveaway more than once, the form displays "You are already in the list of participants" and no duplicate entry is created.', 'gawg' ); ?></p>
+
+			<h2><?php esc_html_e( 'Email Verification', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'When a participant submits the entry form, a verification email is sent to the address they provided. The participant must click the link in that email to confirm their registration.', 'gawg' ); ?>
+			</p>
+			<h3><?php esc_html_e( 'Verification flow', 'gawg' ); ?></h3>
+			<ol>
+				<li><?php esc_html_e( 'Participant submits the form → a verification email is sent using the template configured in GAWG → Settings.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'Participant clicks the verification link within 24 hours → their email is marked as verified and a success email is sent.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'If the link has expired, the participant sees an error page with a "Resend verification link" button that sends a fresh verification email.', 'gawg' ); ?></li>
+				<li><?php esc_html_e( 'If the participant is already verified and visits the link again, no additional email is sent and a confirmation message is shown.', 'gawg' ); ?></li>
+			</ol>
+			<h3><?php esc_html_e( 'Configuring email templates', 'gawg' ); ?></h3>
+			<p>
+				<?php
+				printf(
+					/* translators: %s: link to the Settings page */
+					wp_kses(
+						__( 'Go to <a href="%s">GAWG → Settings</a> and scroll to the Email Templates section. Two templates are available:', 'gawg' ),
+						array( 'a' => array( 'href' => array() ) )
+					),
+					esc_url( admin_url( 'admin.php?page=crb_gawg_settings.php' ) )
+				);
+				?>
+			</p>
+			<ul>
+				<li>
+					<strong><?php esc_html_e( 'Verification Email Template', 'gawg' ); ?></strong> —
+					<?php esc_html_e( 'Sent when a new participant registers. Available placeholders: {participant_email}, {giveaway_title}, {verification_link}', 'gawg' ); ?>
+				</li>
+				<li>
+					<strong><?php esc_html_e( 'Registration Success Email Template', 'gawg' ); ?></strong> —
+					<?php esc_html_e( 'Sent after a participant verifies their email. Available placeholders: {participant_email}, {giveaway_title}, {rules_url}', 'gawg' ); ?>
+				</li>
+			</ul>
+			<p><?php esc_html_e( 'The {rules_url} placeholder is populated from the Rules URL field on each giveaway\'s edit screen (GAWG → Giveaways). Set a Rules URL on the giveaway so participants can be linked directly to the rules page in their success email.', 'gawg' ); ?></p>
+			<p><?php esc_html_e( 'HTML is accepted in both templates. The content is sanitized on display to prevent XSS.', 'gawg' ); ?></p>
 
 			<h2><?php esc_html_e( 'Drawing a Winner', 'gawg' ); ?></h2>
 			<p>
@@ -1056,6 +1109,164 @@ class GAWG_Admin {
 
 		$result['pass']    = true;
 		$result['message'] = 'Entry count stayed at 2; duplicate IP correctly ignored.';
+		return $result;
+	}
+
+	private static function test_verification_sent_at_set() {
+		$result = array(
+			'id'      => 'verification_sent_at_set',
+			'name'    => 'Verification Email Sets Sent-At Timestamp',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id = $setup['post_id'];
+		$term    = get_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		// Suppress actual email sending during test.
+		add_filter( 'pre_wp_mail', '__return_true', 0 );
+		GAWG_Mailer::send_verification_email( $post_id, $term );
+		remove_filter( 'pre_wp_mail', '__return_true', 0 );
+
+		$sent_at  = (int) get_post_meta( $post_id, GAWG_Participant::META_VERIFICATION_SENT_AT, true );
+		$verified = get_post_meta( $post_id, GAWG_Participant::META_VERIFIED, true );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		if ( $sent_at <= 0 ) {
+			$result['message'] = '_gawg_verification_sent_at was not set after send_verification_email.';
+			return $result;
+		}
+
+		if ( '1' === $verified ) {
+			$result['message'] = '_gawg_verified should NOT be set after sending verification email.';
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Sent-at timestamp set; verified flag not prematurely set.';
+		return $result;
+	}
+
+	private static function test_verification_sets_verified_flag() {
+		$result = array(
+			'id'      => 'verification_sets_verified_flag',
+			'name'    => 'Verification Link Sets Verified Flag',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id = $setup['post_id'];
+		$term    = get_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		// Simulate a verification email having been sent within 24h.
+		update_post_meta( $post_id, GAWG_Participant::META_VERIFICATION_SENT_AT, time() );
+
+		// Suppress success email during test.
+		add_filter( 'pre_wp_mail', '__return_true', 0 );
+		$status = GAWG_Verification::process_verification( $post_id, $term );
+		remove_filter( 'pre_wp_mail', '__return_true', 0 );
+
+		$verified = get_post_meta( $post_id, GAWG_Participant::META_VERIFIED, true );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		if ( 'verified' !== $status ) {
+			$result['message'] = 'process_verification returned "' . $status . '" instead of "verified".';
+			return $result;
+		}
+
+		if ( '1' !== $verified ) {
+			$result['message'] = '_gawg_verified was not set to "1" after verification.';
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Participant verified correctly; _gawg_verified = 1.';
+		return $result;
+	}
+
+	private static function test_expired_verification_detected() {
+		$result = array(
+			'id'      => 'expired_verification_detected',
+			'name'    => 'Expired Verification Link Is Detected',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id = $setup['post_id'];
+		$term    = get_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		// Simulate an expired link: sent 25 hours ago.
+		update_post_meta( $post_id, GAWG_Participant::META_VERIFICATION_SENT_AT, time() - 25 * HOUR_IN_SECONDS );
+
+		$status = GAWG_Verification::process_verification( $post_id, $term );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		if ( 'expired' !== $status ) {
+			$result['message'] = 'process_verification returned "' . $status . '" instead of "expired".';
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Expired link correctly identified.';
+		return $result;
+	}
+
+	private static function test_already_verified_skips_reverify() {
+		$result = array(
+			'id'      => 'already_verified_skips_reverify',
+			'name'    => 'Already-Verified Participant Is Not Re-Verified',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id = $setup['post_id'];
+		$term    = get_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		update_post_meta( $post_id, GAWG_Participant::META_VERIFIED, '1' );
+		update_post_meta( $post_id, GAWG_Participant::META_VERIFICATION_SENT_AT, time() );
+
+		$status = GAWG_Verification::process_verification( $post_id, $term );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		if ( 'already_verified' !== $status ) {
+			$result['message'] = 'process_verification returned "' . $status . '" instead of "already_verified".';
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Already-verified participant correctly skipped re-verification.';
 		return $result;
 	}
 

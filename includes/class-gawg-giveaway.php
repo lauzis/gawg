@@ -3,10 +3,11 @@ defined( 'ABSPATH' ) || exit;
 
 class GAWG_Giveaway {
 
-	const TAXONOMY    = 'gawg_giveaway';
-	const META_UUID   = '_gawg_uuid';
-	const META_WINNER = '_gawg_winner';
-	const META_CLOSED = '_gawg_closed';
+	const TAXONOMY       = 'gawg_giveaway';
+	const META_UUID      = '_gawg_uuid';
+	const META_WINNER    = '_gawg_winner';
+	const META_CLOSED    = '_gawg_closed';
+	const META_RULES_URL = '_gawg_rules_url';
 
 	public static function init() {
 		add_action( 'init', array( __CLASS__, 'register_taxonomy' ) );
@@ -14,8 +15,10 @@ class GAWG_Giveaway {
 		add_action( 'created_' . self::TAXONOMY, array( __CLASS__, 'maybe_generate_uuid' ) );
 		add_action( 'edited_' . self::TAXONOMY,  array( __CLASS__, 'maybe_generate_uuid' ) );
 		add_action( 'edited_' . self::TAXONOMY,  array( __CLASS__, 'save_closed_meta' ) );
+		add_action( 'edited_' . self::TAXONOMY,  array( __CLASS__, 'save_rules_url_meta' ) );
 		add_action( self::TAXONOMY . '_add_form_fields',  array( __CLASS__, 'render_uuid_field_new' ) );
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_uuid_field_edit' ) );
+		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_rules_url_field_edit' ) );
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_winner_field_edit' ) );
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_closed_field_edit' ) );
 		add_filter( 'manage_edit-' . self::TAXONOMY . '_columns',          array( __CLASS__, 'add_status_column' ) );
@@ -99,6 +102,19 @@ class GAWG_Giveaway {
 				},
 			)
 		);
+		register_term_meta(
+			self::TAXONOMY,
+			self::META_RULES_URL,
+			array(
+				'type'              => 'string',
+				'single'            => true,
+				'default'           => '',
+				'sanitize_callback' => 'esc_url_raw',
+				'auth_callback'     => function() {
+					return current_user_can( 'manage_options' );
+				},
+			)
+		);
 	}
 
 	public static function maybe_generate_uuid( $term_id ) {
@@ -147,6 +163,35 @@ class GAWG_Giveaway {
 		}
 		$closed = isset( $_POST['gawg_closed'] ) ? '1' : '0'; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce already verified by WP before edited_ fires
 		update_term_meta( $term_id, self::META_CLOSED, $closed );
+	}
+
+	public static function save_rules_url_meta( $term_id ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$url = isset( $_POST['gawg_rules_url'] ) ? esc_url_raw( wp_unslash( $_POST['gawg_rules_url'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce already verified by WP before edited_ fires
+		update_term_meta( $term_id, self::META_RULES_URL, $url );
+	}
+
+	public static function render_rules_url_field_edit( $term ) {
+		$rules_url = (string) get_term_meta( $term->term_id, self::META_RULES_URL, true );
+		?>
+		<tr class="form-field">
+			<th scope="row">
+				<label for="gawg-rules-url"><?php esc_html_e( 'Rules URL', 'gawg' ); ?></label>
+			</th>
+			<td>
+				<input
+					type="url"
+					id="gawg-rules-url"
+					name="gawg_rules_url"
+					value="<?php echo esc_attr( $rules_url ); ?>"
+					style="width:100%;"
+				/>
+				<p class="description"><?php esc_html_e( 'URL to the giveaway rules page. Used in success emails sent to verified participants.', 'gawg' ); ?></p>
+			</td>
+		</tr>
+		<?php
 	}
 
 	public static function render_closed_field_edit( $term ) {
