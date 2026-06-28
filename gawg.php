@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: GAWG
+ * Plugin Name: GAWG — GiveAway Winner Generator
  * Description: Create giveaways, collect applicant entries, and run a lottery to pick winners.
  * Version:     1.0.0
  * Author:      Aivars Lauzis

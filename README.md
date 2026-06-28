@@ -1,4 +1,4 @@
-# GAWG
+# GAWG — GiveAway Winner Generator
 
 ## What is it?
 A WordPress plugin for running giveaways: create a giveaway entry, collect participant UUIDs via external forms or links, and pick a winner at random.
