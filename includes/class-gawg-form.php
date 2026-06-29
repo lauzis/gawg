@@ -56,6 +56,9 @@ class GAWG_Form {
 			return '';
 		}
 
+		$not_open_yet     = false;
+		$not_open_message = '';
+
 		$giveaway_term = self::find_term_by_uuid( $uuid );
 		if ( null !== $giveaway_term ) {
 			$has_winner = (int) get_term_meta( $giveaway_term->term_id, GAWG_Giveaway::META_WINNER, true ) > 0;
@@ -72,10 +75,10 @@ class GAWG_Form {
 			if ( '' !== $reg_start ) {
 				$start_dt = DateTime::createFromFormat( 'Y-m-d\TH:i', $reg_start, $timezone );
 				if ( $start_dt && $now_utc < $start_dt->getTimestamp() ) {
-					$msg = '' !== $atts['not_open_message']
+					$not_open_yet     = true;
+					$not_open_message = '' !== $atts['not_open_message']
 						? wp_kses_post( $atts['not_open_message'] )
 						: esc_html__( 'Registration is not open yet.', 'gawg' );
-					return '<p class="gawg-not-open-message">' . $msg . '</p>';
 				}
 			}
 
@@ -104,11 +107,13 @@ class GAWG_Form {
 		$recaptcha_site_key = GAWG_Settings::get_recaptcha_site_key();
 		$recaptcha_enabled  = GAWG_Settings::is_recaptcha_enabled();
 
-		wp_enqueue_script( 'gawg-form' );
-		if ( $recaptcha_enabled ) {
-			wp_enqueue_script( 'google-recaptcha' );
+		if ( ! $not_open_yet ) {
+			wp_enqueue_script( 'gawg-form' );
+			if ( $recaptcha_enabled ) {
+				wp_enqueue_script( 'google-recaptcha' );
+			}
 		}
-		if ( ! self::$script_localized ) {
+		if ( ! self::$script_localized && ! $not_open_yet ) {
 			wp_localize_script(
 				'gawg-form',
 				'gawgFormConfig',
@@ -133,8 +138,13 @@ class GAWG_Form {
 
 		ob_start();
 		?>
-		<div class="gawg-form-wrap" id="<?php echo esc_attr( $wrap_id ); ?>">
+		<div class="gawg-form-wrap<?php echo $not_open_yet ? ' gawg-form--disabled' : ''; ?>" id="<?php echo esc_attr( $wrap_id ); ?>">
+			<?php if ( $not_open_yet ) : ?>
+			<p class="gawg-not-open-message"><?php echo $not_open_message; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- sanitized via wp_kses_post above ?></p>
+			<?php endif; ?>
+			<?php if ( ! $not_open_yet ) : ?>
 			<div class="gawg-form-success" style="display:none;"><?php echo $success_message; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- sanitized via wp_kses_post above ?></div>
+			<?php endif; ?>
 			<form class="gawg-form" novalidate>
 				<?php wp_nonce_field( 'gawg_form_' . $uuid, '_gawg_nonce', false ); ?>
 				<input type="hidden" name="gawg_uuid" value="<?php echo esc_attr( $uuid ); ?>">
@@ -149,12 +159,13 @@ class GAWG_Form {
 						name="gawg_email"
 						required
 						autocomplete="email"
+						<?php if ( $not_open_yet ) : ?>disabled<?php endif; ?>
 					>
 				</p>
 				<?php if ( '' !== $rules_url ) : ?>
 				<p>
 					<label>
-						<input type="checkbox" name="gawg_rules" value="1" required>
+						<input type="checkbox" name="gawg_rules" value="1" required<?php if ( $not_open_yet ) : ?> disabled<?php endif; ?>>
 						<?php
 						printf(
 							/* translators: %s: URL of the giveaway rules page */
@@ -168,11 +179,11 @@ class GAWG_Form {
 					</label>
 				</p>
 				<?php endif; ?>
-				<?php if ( $recaptcha_enabled ) : ?>
+				<?php if ( $recaptcha_enabled && ! $not_open_yet ) : ?>
 				<div class="g-recaptcha" data-sitekey="<?php echo esc_attr( $recaptcha_site_key ); ?>"></div>
 				<?php endif; ?>
 				<p>
-					<button type="submit"><?php esc_html_e( 'Apply', 'gawg' ); ?></button>
+					<button type="submit"<?php if ( $not_open_yet ) : ?> disabled<?php endif; ?>><?php esc_html_e( 'Apply', 'gawg' ); ?></button>
 				</p>
 				<div class="gawg-form-message" role="alert" aria-live="polite"></div>
 			</form>
