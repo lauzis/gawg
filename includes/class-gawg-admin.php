@@ -653,7 +653,7 @@ class GAWG_Admin {
 				<?php esc_html_e( 'Set these on the giveaway\'s edit screen (GAWG → Giveaways → click the giveaway name). Both fields accept a date and time in the site\'s local timezone.', 'gawg' ); ?>
 			</p>
 			<ul>
-				<li><strong><?php esc_html_e( 'Registration Opens', 'gawg' ); ?></strong> — <?php esc_html_e( 'Before this date/time the form shows "Registration is not open yet." and new submissions are rejected. Leave empty to open registration immediately.', 'gawg' ); ?></li>
+				<li><strong><?php esc_html_e( 'Registration Opens', 'gawg' ); ?></strong> — <?php esc_html_e( 'Before this date/time the full entry form is displayed in a disabled state (all inputs and the submit button are disabled, the wrapper receives the gawg-form--disabled CSS class) with the "Registration is not open yet." message shown above it. New submissions are rejected server-side regardless. Leave empty to open registration immediately.', 'gawg' ); ?></li>
 				<li><strong><?php esc_html_e( 'Registration Closes', 'gawg' ); ?></strong> — <?php esc_html_e( 'After this date/time the form shows "Registration is closed." and new submissions are rejected. Leave empty to keep registration open indefinitely.', 'gawg' ); ?></li>
 			</ul>
 			<p><?php esc_html_e( 'The default messages can be overridden per-placement using the not_open_message and closed_message shortcode attributes, or the matching text fields in the Giveaway Form block\'s Inspector Controls.', 'gawg' ); ?></p>
