@@ -62,7 +62,57 @@ It could be useful for anyone running small giveaways on a WordPress site withou
 7. Go to **GAWG → Participants** to view all entries and their per-giveaway entry counts, filtered by giveaway if needed.
 
 ## Current State
-The plugin is in early development (v1.0.0). Giveaways are modelled as a custom taxonomy and participants as a custom post type, both with auto-generated reference UUIDs. The `[gawg_form]` shortcode and the `gawg/form` Gutenberg block both enable front-end AJAX entry collection; both share the same rendering code so changes to the shortcode output apply to both automatically. Every form includes a honeypot field that silently rejects bot submissions server-side. Optional Google reCAPTCHA v2 (checkbox) integration is also available — configure it via **GAWG → Settings** and it is activated automatically when both keys are present. Upon form submission a verification email is sent to the participant; clicking the unique link in that email marks the participant as verified and triggers a success email. Verification links expire after 24 hours; an error page with a resend option is displayed for expired links. Both email templates (verification and success) are HTML-editable on the Settings page with documented placeholder variables. The giveaway taxonomy term now also stores an optional **Rules URL** used as the `{rules_url}` placeholder in the success email. After submitting the form each participant receives a personal invite link; unique IP visits via that link increment the participant's entry count for the giveaway (IP deduplication is enforced server-side). Visitors who arrive via an invite link and then register earn the inviter a second configurable bonus via cookie-based attribution. Both bonus amounts are configurable on the Settings page (defaults: +1 each). The **Draw Winner** page (**GAWG → Draw Winner**) allows selecting an active giveaway, viewing participants with masked emails, running an animated shuffle, and picking a random winner server-side; the winner is stored on the giveaway term and displayed read-only on its edit screen. Each giveaway now carries a status — Active, Closed, or Winner Drawn — visible as a sortable badge column in the Giveaways admin list. When a giveaway is closed (manually via the edit screen) or a winner has been drawn, the entry form shows a "Sorry, this giveaway is closed" message and server-side submission is rejected. Each participant now has a full **action history**: key lifecycle events (`registered`, `verification_email_sent`, `success_email_sent`, `verified`, `invite_visited`, `invite_registered`, `invite_verified`) are automatically appended as timestamped post meta entries and displayed in a read-only table on the participant's edit screen under **Action History**. A new `gawg_add_extra_entries` WordPress action hook lets external plugins award additional entries to verified participants programmatically; the hook supports uniqueness enforcement (one award per giveaway per action ID), a configurable entry count, and a max-entries cap for repeatable awards. Each giveaway now also supports optional **Registration Opens** and **Registration Closes** datetime fields (set on the giveaway's edit screen, in site local time). Before the open date/time the entry form is rendered in a disabled state — all interactive fields and the submit button carry the `disabled` HTML attribute and the wrapper element receives the `gawg-form--disabled` CSS class — with the "Registration is not open yet." message shown above it; after the close date/time the form shows "Registration is closed." and submissions are similarly rejected. Server-side AJAX submissions are rejected in both cases regardless of client-side state. Both messages can be overridden per-placement via `not_open_message` and `closed_message` shortcode attributes or the matching Inspector Controls in the Gutenberg block.
+
+The core feature set is complete. No major new features are planned — only small adjustments and bug fixes going forward.
+
+**Core data model**
+
+Giveaways are modelled as a custom taxonomy (`gawg_giveaway`) and participants as a custom post type (`gawg_participant`), both with auto-generated v4 reference UUIDs. Each giveaway term optionally stores a **Rules URL** surfaced in success emails.
+
+**Entry form & Gutenberg block**
+
+The `[gawg_form]` shortcode and the `gawg/form` Gutenberg block share the same rendering code, so changes to the shortcode output apply to both automatically. Both enable front-end AJAX entry collection with duplicate-entry detection.
+
+**Spam protection**
+
+- **Honeypot** — a hidden field silently rejects bot submissions server-side.
+- **Google reCAPTCHA v2** — optional checkbox widget; activated automatically when both a Site Key and Secret Key are configured on the Settings page.
+
+**Email verification**
+
+Upon form submission a verification email is sent to the participant. Clicking the unique link marks the participant as verified and triggers a success email. Verification links expire after 24 hours; an error page with a resend option handles expired links. Both email templates (verification and success) are HTML-editable on the Settings page with documented placeholder variables.
+
+**Invite links & bonus entries**
+
+After a successful submission each participant receives a personal invite link. Two bonus mechanisms are available:
+
+- Unique IP visits via the link increment the inviting participant's entry count (IP deduplication enforced server-side).
+- Visitors who arrive via an invite link and then register earn the inviter a second configurable bonus via cookie-based attribution.
+
+Both bonus amounts are configurable on the Settings page (defaults: +1 each).
+
+**Giveaway status & date gating**
+
+Each giveaway carries a status — **Active**, **Closed**, or **Winner Drawn** — shown as a sortable badge column in the Giveaways admin list. When a giveaway is closed or a winner has been drawn, the entry form shows a "Sorry, this giveaway is closed" message and server-side submissions are rejected.
+
+Optional **Registration Opens** and **Registration Closes** datetime fields (set on the giveaway's edit screen, in site local time) allow automatic date gating:
+
+- Before the open date/time the form renders in a disabled state (`disabled` attribute on all inputs and the submit button; `gawg-form--disabled` CSS class on the wrapper) with a configurable "not open yet" message.
+- After the close date/time the form shows a configurable "closed" message and submissions are rejected server-side regardless of client-side state.
+
+Both messages can be overridden per-placement via shortcode attributes or the matching Inspector Controls in the Gutenberg block.
+
+**Winner draw**
+
+The **Draw Winner** admin page lets you select an active giveaway, view participants with masked emails, run an animated shuffle, and pick a random winner server-side. The winner is stored on the giveaway term and displayed read-only on its edit screen.
+
+**Participant action history**
+
+Key lifecycle events (`registered`, `verification_email_sent`, `success_email_sent`, `verified`, `invite_visited`, `invite_registered`, `invite_verified`) are automatically appended as timestamped post meta entries and displayed in a read-only **Action History** table on each participant's edit screen.
+
+**Extensibility**
+
+A `gawg_add_extra_entries` WordPress action hook lets external plugins award additional entries to verified participants programmatically. The hook supports uniqueness enforcement (one award per giveaway per action ID), a configurable entry count, and a max-entries cap for repeatable awards.
 
 ## Development
 This project is maintained with the assistance of [Claude Code](https://claude.ai/code) and [CodeRabbit](https://coderabbit.ai).
