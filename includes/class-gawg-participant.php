@@ -195,6 +195,158 @@ class GAWG_Participant {
 		);
 	}
 
+	/**
+	 * Return every giveaway a given email address is participating in, with entry breakdowns.
+	 *
+	 * Intended for use on a front-end "profile" page: pass an email address and receive a plain
+	 * array of associative arrays, one per giveaway the address is entered in. This method produces
+	 * no output and performs no ownership check on the supplied address, so the caller is responsible
+	 * for verifying that the visitor is entitled to view the given email's participation data.
+	 *
+	 * Each element has the shape:
+	 *   array(
+	 *     'giveaway_uuid'     => (string) giveaway reference UUID,
+	 *     'giveaway_title'    => (string) giveaway name,
+	 *     'status'            => (string) one of 'active', 'closed', 'winner_drawn',
+	 *     'status_label'      => (string) translated human-readable status label,
+	 *     'total_entries'     => (int)    total entry count for this giveaway,
+	 *     'entries_by_source' => array(
+	 *         'registered'        => (int) base entry awarded for registering,
+	 *         'invite_visited'    => (int) entries from unique invite-link visits,
+	 *         'invite_registered' => (int) entries from referred registrations,
+	 *         'extra_entries'     => (int) entries awarded via gawg_add_extra_entries,
+	 *     ),
+	 *   )
+	 *
+	 * The per-source breakdown is derived from the stored entry-count meta (registration base,
+	 * unique-visit markers and referred-registration markers), not from the action history log.
+	 * The `extra_entries` bucket is the remainder once the other known sources are accounted for.
+	 *
+	 * @param string $email Email address to look up.
+	 * @return array List of giveaway participation records; empty array for an unknown or empty email.
+	 */
+	public static function get_giveaways_for_email( $email ) {
+		$email = strtolower( sanitize_email( (string) $email ) );
+		if ( '' === $email || ! is_email( $email ) ) {
+			return array();
+		}
+
+		$participants = get_posts( array(
+			'post_type'      => self::POST_TYPE,
+			'post_status'    => 'publish',
+			'title'          => $email,
+			'posts_per_page' => -1,
+		) );
+
+		if ( empty( $participants ) ) {
+			return array();
+		}
+
+		$unique_visit_amount = GAWG_Settings::get_extra_entries_unique_visit();
+		$registration_amount = GAWG_Settings::get_extra_entries_registration();
+
+		$results = array();
+
+		foreach ( $participants as $participant ) {
+			$terms = wp_get_object_terms( $participant->ID, GAWG_Giveaway::TAXONOMY );
+			if ( is_wp_error( $terms ) || empty( $terms ) ) {
+				continue;
+			}
+
+			foreach ( $terms as $term ) {
+				$giveaway_uuid = get_term_meta( $term->term_id, GAWG_Giveaway::META_UUID, true );
+				if ( '' === $giveaway_uuid || isset( $results[ $term->term_id ] ) ) {
+					continue;
+				}
+
+				$total = (int) get_post_meta( $participant->ID, self::META_ENTRIES_PREFIX . $giveaway_uuid, true );
+				if ( $total < 1 ) {
+					$total = 1;
+				}
+
+				list( $status, $status_label ) = self::giveaway_status( $term->term_id );
+
+				$results[ $term->term_id ] = array(
+					'giveaway_uuid'     => $giveaway_uuid,
+					'giveaway_title'    => $term->name,
+					'status'            => $status,
+					'status_label'      => $status_label,
+					'total_entries'     => $total,
+					'entries_by_source' => self::entries_breakdown_for_giveaway(
+						$participant->ID,
+						$giveaway_uuid,
+						$total,
+						$unique_visit_amount,
+						$registration_amount
+					),
+				);
+			}
+		}
+
+		return array_values( $results );
+	}
+
+	/**
+	 * Reconstruct an entry breakdown by source from a participant's stored meta.
+	 *
+	 * @param int    $participant_id      Participant post ID.
+	 * @param string $giveaway_uuid       Giveaway reference UUID.
+	 * @param int    $total               Total entry count for the giveaway.
+	 * @param int    $unique_visit_amount Entries awarded per unique invite-link visit.
+	 * @param int    $registration_amount Entries awarded per referred registration.
+	 * @return array Breakdown keyed by source.
+	 */
+	private static function entries_breakdown_for_giveaway( $participant_id, $giveaway_uuid, $total, $unique_visit_amount, $registration_amount ) {
+		$all_meta = get_post_meta( $participant_id );
+
+		$visit_prefix   = self::META_VISIT_PREFIX . $giveaway_uuid . '_';
+		$invitee_prefix = 'gawg_invitee_' . $giveaway_uuid . '_';
+
+		$visit_count   = 0;
+		$invitee_count = 0;
+
+		foreach ( $all_meta as $key => $values ) {
+			$value = is_array( $values ) && isset( $values[0] ) ? $values[0] : $values;
+
+			if ( 0 === strpos( $key, $visit_prefix ) && '1' === (string) $value ) {
+				$visit_count++;
+			} elseif ( 0 === strpos( $key, $invitee_prefix ) && 'registered' === (string) $value ) {
+				$invitee_count++;
+			}
+		}
+
+		$registered        = 1;
+		$invite_visited    = $visit_count * $unique_visit_amount;
+		$invite_registered = $invitee_count * $registration_amount;
+		$extra_entries     = max( 0, $total - $registered - $invite_visited - $invite_registered );
+
+		return array(
+			'registered'        => $registered,
+			'invite_visited'    => $invite_visited,
+			'invite_registered' => $invite_registered,
+			'extra_entries'     => $extra_entries,
+		);
+	}
+
+	/**
+	 * Resolve a giveaway term's status.
+	 *
+	 * @param int $term_id Giveaway term ID.
+	 * @return array{0:string,1:string} Machine status key and translated label.
+	 */
+	private static function giveaway_status( $term_id ) {
+		$winner_id = (int) get_term_meta( $term_id, GAWG_Giveaway::META_WINNER, true );
+		$is_closed = '1' === get_term_meta( $term_id, GAWG_Giveaway::META_CLOSED, true );
+
+		if ( $winner_id > 0 ) {
+			return array( 'winner_drawn', __( 'Winner Drawn', 'gawg' ) );
+		}
+		if ( $is_closed ) {
+			return array( 'closed', __( 'Closed', 'gawg' ) );
+		}
+		return array( 'active', __( 'Active', 'gawg' ) );
+	}
+
 	public static function add_entries_column( $columns ) {
 		$columns['gawg_entries'] = __( 'Entries', 'gawg' );
 		return $columns;
