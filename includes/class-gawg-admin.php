@@ -23,6 +23,7 @@ class GAWG_Admin {
 		'history_verified_recorded'           => 'History: Verified Action Is Recorded',
 		'history_invite_visited_recorded'     => 'History: Invite Visited Is Recorded',
 		'history_invite_registered_recorded'  => 'History: Invite Registered Is Recorded',
+		'giveaways_for_email_breakdown'       => 'Get Giveaways For Email Returns Entry Breakdown',
 	);
 
 	public static function init() {
@@ -459,6 +460,9 @@ class GAWG_Admin {
 				case 'history_invite_registered_recorded':
 					$results[] = self::test_history_invite_registered_recorded();
 					break;
+				case 'giveaways_for_email_breakdown':
+					$results[] = self::test_giveaways_for_email_breakdown();
+					break;
 			}
 		}
 
@@ -842,6 +846,46 @@ class GAWG_Admin {
         'unique'            => true,
     ) );
 }, 10, 2 );</code></pre>
+
+			<hr>
+
+			<h2><?php esc_html_e( 'Listing a participant\'s giveaways (for a profile page)', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'To render a participant\'s giveaway participation on a front-end profile page, call the GAWG_Participant::get_giveaways_for_email() helper. It looks up every giveaway the given email address is entered in and returns a plain array of associative arrays — one per giveaway — that you can loop over in your template.', 'gawg' ); ?>
+			</p>
+			<p>
+				<strong><?php esc_html_e( 'Privacy note:', 'gawg' ); ?></strong>
+				<?php esc_html_e( 'This function performs no ownership check on the email address. Only call it with an address the current visitor is entitled to see (e.g. the logged-in user\'s own email).', 'gawg' ); ?>
+			</p>
+			<h3><?php esc_html_e( 'Return shape', 'gawg' ); ?></h3>
+			<p><?php esc_html_e( 'An array of records (empty for an unknown or empty email), each shaped like:', 'gawg' ); ?></p>
+			<pre><code>array(
+    'giveaway_uuid'     => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx',
+    'giveaway_title'    => 'Summer Giveaway',
+    'status'            => 'active', // or 'closed', 'winner_drawn'
+    'status_label'      => 'Active', // translated, human-readable
+    'total_entries'     => 5,
+    'entries_by_source' => array(
+        'registered'        => 1, // base entry for registering
+        'invite_visited'    => 2, // unique invite-link visits
+        'invite_registered' => 1, // referred registrations
+        'extra_entries'     => 1, // awarded via gawg_add_extra_entries
+    ),
+)</code></pre>
+			<p>
+				<?php esc_html_e( 'The entries_by_source breakdown is derived from the stored entry-count meta, not the action history log. The extra_entries bucket holds whatever remains once the registration base and invite bonuses are accounted for.', 'gawg' ); ?>
+			</p>
+			<h3><?php esc_html_e( 'Example', 'gawg' ); ?></h3>
+			<pre><code>$giveaways = GAWG_Participant::get_giveaways_for_email( $current_user_email );
+
+foreach ( $giveaways as $giveaway ) {
+    printf(
+        '%s (%s) — %d entries',
+        esc_html( $giveaway['giveaway_title'] ),
+        esc_html( $giveaway['status_label'] ),
+        (int) $giveaway['total_entries']
+    );
+}</code></pre>
 
 		</div>
 		<?php
@@ -1582,6 +1626,89 @@ class GAWG_Admin {
 
 		$result['pass']    = true;
 		$result['message'] = '"invite_registered" correctly recorded in history.';
+		return $result;
+	}
+
+	private static function test_giveaways_for_email_breakdown() {
+		$result = array(
+			'id'      => 'giveaways_for_email_breakdown',
+			'name'    => 'Get Giveaways For Email Returns Entry Breakdown',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id       = $setup['post_id'];
+		$giveaway_uuid = $setup['giveaway_uuid'];
+
+		// The helper assigns a non-email title, so replace it with a valid, unique address to query by.
+		$email = 'gawg-test-' . md5( $giveaway_uuid ) . '@example.com';
+		wp_update_post( array( 'ID' => $post_id, 'post_title' => $email ) );
+
+		$unique_visit_amount = GAWG_Settings::get_extra_entries_unique_visit();
+		$registration_amount = GAWG_Settings::get_extra_entries_registration();
+
+		// Compose a total from 1 registration + 1 unique visit + 1 referred registration + 2 extra entries.
+		$total = 1 + $unique_visit_amount + $registration_amount + 2;
+		update_post_meta( $post_id, GAWG_Participant::META_ENTRIES_PREFIX . $giveaway_uuid, $total );
+		update_post_meta( $post_id, GAWG_Participant::META_VISIT_PREFIX . $giveaway_uuid . '_' . md5( '198.51.100.7' ), '1' ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_md5
+		update_post_meta( $post_id, 'gawg_invitee_' . $giveaway_uuid . '_' . wp_generate_uuid4(), 'registered' );
+
+		$giveaways = GAWG_Participant::get_giveaways_for_email( $email );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		if ( empty( $giveaways ) || ! is_array( $giveaways ) ) {
+			$result['message'] = 'Expected a non-empty array of giveaways.';
+			return $result;
+		}
+
+		$record = null;
+		foreach ( $giveaways as $giveaway ) {
+			if ( isset( $giveaway['giveaway_uuid'] ) && $giveaway['giveaway_uuid'] === $giveaway_uuid ) {
+				$record = $giveaway;
+				break;
+			}
+		}
+
+		if ( null === $record ) {
+			$result['message'] = 'Test giveaway not found in returned data.';
+			return $result;
+		}
+
+		if ( (int) $record['total_entries'] !== $total ) {
+			$result['message'] = 'Expected total_entries ' . $total . ', got ' . $record['total_entries'];
+			return $result;
+		}
+
+		if ( 'active' !== $record['status'] ) {
+			$result['message'] = 'Expected status "active", got ' . $record['status'];
+			return $result;
+		}
+
+		$breakdown = isset( $record['entries_by_source'] ) ? $record['entries_by_source'] : array();
+		$expected  = array(
+			'registered'        => 1,
+			'invite_visited'    => $unique_visit_amount,
+			'invite_registered' => $registration_amount,
+			'extra_entries'     => 2,
+		);
+
+		foreach ( $expected as $key => $value ) {
+			if ( ! isset( $breakdown[ $key ] ) || (int) $breakdown[ $key ] !== $value ) {
+				$result['message'] = 'Breakdown "' . $key . '" expected ' . $value . ', got ' . ( isset( $breakdown[ $key ] ) ? $breakdown[ $key ] : 'missing' );
+				return $result;
+			}
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Returned correct entry breakdown and status for email.';
 		return $result;
 	}
 
