@@ -29,6 +29,7 @@ class GAWG_Admin {
 	public static function init() {
 		add_action( 'admin_menu',                           array( __CLASS__, 'register_menus' ) );
 		add_action( 'admin_enqueue_scripts',                array( __CLASS__, 'enqueue_draw_winner_scripts' ) );
+		add_action( 'admin_enqueue_scripts',                array( __CLASS__, 'enqueue_help_scripts' ) );
 		add_action( 'wp_ajax_gawg_run_self_tests',          array( __CLASS__, 'ajax_run_self_tests' ) );
 		add_action( 'wp_ajax_gawg_load_participants',       array( __CLASS__, 'ajax_load_participants' ) );
 		add_action( 'wp_ajax_gawg_pick_winner',             array( __CLASS__, 'ajax_pick_winner' ) );
@@ -116,6 +117,26 @@ class GAWG_Admin {
 					'selectGiveaway' => __( 'Please select a giveaway.', 'gawg' ),
 				),
 			)
+		);
+	}
+
+	/**
+	 * Load Mermaid on the Help page so the "How It Works" flowcharts render.
+	 */
+	public static function enqueue_help_scripts( $hook ) {
+		if ( 'gawg_page_gawg-help' !== $hook ) {
+			return;
+		}
+		wp_enqueue_script(
+			'gawg-mermaid',
+			'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js',
+			array(),
+			'11',
+			true
+		);
+		wp_add_inline_script(
+			'gawg-mermaid',
+			'mermaid.initialize({ startOnLoad: true });'
 		);
 	}
 
@@ -481,6 +502,121 @@ class GAWG_Admin {
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'GAWG Help', 'gawg' ); ?></h1>
+
+			<h2><?php esc_html_e( 'How It Works', 'gawg' ); ?></h2>
+			<p><?php esc_html_e( 'These flowcharts document the plugin\'s main flows end-to-end. They match the diagrams in the project README.', 'gawg' ); ?></p>
+
+			<h3><?php esc_html_e( 'Registration', 'gawg' ); ?></h3>
+			<pre class="mermaid">
+flowchart TD
+    A[Visitor submits gawg_form] --> B{Honeypot filled?}
+    B -- Yes --> R1[Reject silently]
+    B -- No --> C{reCAPTCHA valid?}
+    C -- No --> R2[Reject with error]
+    C -- Yes --> D{Duplicate email for this giveaway?}
+    D -- Yes --> R3[Show 'already in the list']
+    D -- No --> E[Create gawg_participant post + UUID]
+    E --> F[Log 'registered' + record base entry]
+    F --> G[Send verification email + log 'verification_email_sent']
+    G --> H[Participant clicks link]
+    H --> I{Link expired 24h?}
+    I -- Yes --> J[Error page + Resend verification button]
+    I -- No --> K[Mark verified + log 'verified']
+    K --> L[Send success email + log 'success_email_sent']
+			</pre>
+
+			<h3><?php esc_html_e( 'Entries', 'gawg' ); ?></h3>
+			<pre class="mermaid">
+flowchart TD
+    A[Entry event] --> B{Source}
+    B -- Registration --> C[Base entry]
+    B -- Unique invite visit --> D[Unique-visit bonus]
+    B -- Referred registration --> E[Registration bonus]
+    B -- gawg_add_extra_entries --> F[Extra entries]
+    C --> G[Per-giveaway entry-count meta]
+    D --> G
+    E --> G
+    F --> G
+    G --> H[Participants list column + 'Entries & Invite Links' panel]
+			</pre>
+
+			<h3><?php esc_html_e( 'Linked entries', 'gawg' ); ?></h3>
+			<pre class="mermaid">
+flowchart TD
+    A[Participant shares personal invite link] --> B[Visitor opens link]
+    B --> C{New unique IP?}
+    C -- No --> C1[Ignore repeat visit]
+    C -- Yes --> D[Award unique-visit bonus + log 'invite_visited']
+    B --> E[Set short-lived attribution cookie]
+    E --> F{Visitor registers for the same giveaway?}
+    F -- No --> F1[No further bonus]
+    F -- Yes --> G{Referral bonus already awarded?}
+    G -- Yes --> G1[Skip]
+    G -- No --> H[Award registration bonus + log 'invite_registered']
+			</pre>
+
+			<h3><?php esc_html_e( 'Custom entries', 'gawg' ); ?></h3>
+			<pre class="mermaid">
+flowchart TD
+    A["do_action('gawg_add_extra_entries', $args)"] --> B{action_id and message present?}
+    B -- No --> X[Return, no-op]
+    B -- Yes --> C[Resolve participant by uuid or email]
+    C --> D{Participant found and verified?}
+    D -- No --> X
+    D -- Yes --> E{giveaway_uuid supplied?}
+    E -- Yes --> F[Target that giveaway if active]
+    E -- No --> G[Target all active giveaways]
+    F --> H{unique?}
+    G --> H
+    H -- true --> I{Per-giveaway flag already set?}
+    I -- Yes --> J[Skip giveaway]
+    I -- No --> K[Award entry_count + set flag + log history]
+    H -- false --> L{Counter < max_entries?}
+    L -- No --> M[Skip]
+    L -- Yes --> N[Award entry_count + increment counter + log history]
+			</pre>
+
+			<h3><?php esc_html_e( 'Winner picking', 'gawg' ); ?></h3>
+			<pre class="mermaid">
+flowchart TD
+    A[Admin opens Draw Winner] --> B[Select an active giveaway]
+    B --> C[AJAX loads masked participant list]
+    C --> D[Set shuffle count + delay]
+    D --> E[Click 'Shuffle & Pick Winner']
+    E --> F[Client animates through the list]
+    F --> G[AJAX gawg_pick_winner picks random server-side]
+    G --> H[Store winner post ID on the giveaway term]
+    H --> I[Status becomes 'Winner Drawn']
+    I --> J[Masked winner shown + read-only Winner field on term]
+			</pre>
+
+			<h3><?php esc_html_e( 'Function arguments and response structure', 'gawg' ); ?></h3>
+			<pre class="mermaid">
+flowchart LR
+    H["gawg_add_extra_entries $args"] --> A1["participant_uuid / participant_email — one required (uuid wins)"]
+    H --> A2["action_id — required, used in dedupe meta keys"]
+    H --> A3["message — required, logged to history"]
+    H --> A4["giveaway_uuid — optional, all active giveaways if omitted"]
+    H --> A5["entry_count — default 1"]
+    H --> A6["unique — default true"]
+    H --> A7["max_entries — default 10, non-unique cap"]
+    H --> RET["Action hook, no return value; result recorded in participant history"]
+			</pre>
+			<pre class="mermaid">
+flowchart LR
+    IN["get_giveaways_for_email(email)"] --> OUT["array of records — empty for unknown/empty email"]
+    OUT --> R[record]
+    R --> R1[giveaway_uuid : string]
+    R --> R2[giveaway_title : string]
+    R --> R3["status : active | closed | winner_drawn"]
+    R --> R4[status_label : string translated]
+    R --> R5[total_entries : int]
+    R --> R6[entries_by_source : array]
+    R6 --> S1[registered : int]
+    R6 --> S2[invite_visited : int]
+    R6 --> S3[invite_registered : int]
+    R6 --> S4[extra_entries : int]
+			</pre>
 
 			<h2><?php esc_html_e( 'Creating a Giveaway', 'gawg' ); ?></h2>
 			<p>
