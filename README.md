@@ -35,6 +35,143 @@ It could be useful for anyone running small giveaways on a WordPress site withou
   - **Help** page — step-by-step instructions for creating giveaways, adding participants, embedding the entry form, and configuring email verification.
   - **Settings** page — configure plugin-wide options: Google reCAPTCHA keys, extra entries for unique visit (default 1), extra entries for registration after visit (default 1), and HTML email templates for verification and success emails.
 
+## How the Plugin Works
+
+The diagrams below document the main flows end-to-end. They mirror the "How It Works" section on the **GAWG → Help** admin page.
+
+### Registration
+
+How an entry is submitted, verified, and confirmed.
+
+```mermaid
+flowchart TD
+    A[Visitor submits gawg_form] --> B{Honeypot filled?}
+    B -- Yes --> R1[Reject silently]
+    B -- No --> C{reCAPTCHA valid?}
+    C -- No --> R2[Reject with error]
+    C -- Yes --> D{Duplicate email for this giveaway?}
+    D -- Yes --> R3[Show 'already in the list']
+    D -- No --> E[Create gawg_participant post + UUID]
+    E --> F[Log 'registered' + record base entry]
+    F --> G[Send verification email + log 'verification_email_sent']
+    G --> H[Participant clicks link]
+    H --> I{Link expired 24h?}
+    I -- Yes --> J[Error page + Resend verification button]
+    I -- No --> K[Mark verified + log 'verified']
+    K --> L[Send success email + log 'success_email_sent']
+```
+
+### Entries
+
+How entry counts are accumulated per giveaway and surfaced in the admin.
+
+```mermaid
+flowchart TD
+    A[Entry event] --> B{Source}
+    B -- Registration --> C[Base entry]
+    B -- Unique invite visit --> D[Unique-visit bonus]
+    B -- Referred registration --> E[Registration bonus]
+    B -- gawg_add_extra_entries --> F[Extra entries]
+    C --> G[Per-giveaway entry-count meta]
+    D --> G
+    E --> G
+    F --> G
+    G --> H[Participants list column + 'Entries & Invite Links' panel]
+```
+
+### Linked entries
+
+How invite links award the inviter both a unique-visit bonus and a referred-registration bonus.
+
+```mermaid
+flowchart TD
+    A[Participant shares personal invite link] --> B[Visitor opens link]
+    B --> C{New unique IP?}
+    C -- No --> C1[Ignore repeat visit]
+    C -- Yes --> D[Award unique-visit bonus + log 'invite_visited']
+    B --> E[Set short-lived attribution cookie]
+    E --> F{Visitor registers for the same giveaway?}
+    F -- No --> F1[No further bonus]
+    F -- Yes --> G{Referral bonus already awarded?}
+    G -- Yes --> G1[Skip]
+    G -- No --> H[Award registration bonus + log 'invite_registered']
+```
+
+### Custom entries
+
+How the `gawg_add_extra_entries` action hook awards programmatic bonus entries.
+
+```mermaid
+flowchart TD
+    A["do_action('gawg_add_extra_entries', $args)"] --> B{action_id and message present?}
+    B -- No --> X[Return, no-op]
+    B -- Yes --> C[Resolve participant by uuid or email]
+    C --> D{Participant found and verified?}
+    D -- No --> X
+    D -- Yes --> E{giveaway_uuid supplied?}
+    E -- Yes --> F[Target that giveaway if active]
+    E -- No --> G[Target all active giveaways]
+    F --> H{unique?}
+    G --> H
+    H -- true --> I{Per-giveaway flag already set?}
+    I -- Yes --> J[Skip giveaway]
+    I -- No --> K[Award entry_count + set flag + log history]
+    H -- false --> L{Counter < max_entries?}
+    L -- No --> M[Skip]
+    L -- Yes --> N[Award entry_count + increment counter + log history]
+```
+
+### Winner picking
+
+How the Draw Winner page selects and stores a winner.
+
+```mermaid
+flowchart TD
+    A[Admin opens Draw Winner] --> B[Select an active giveaway]
+    B --> C[AJAX loads masked participant list]
+    C --> D[Set shuffle count + delay]
+    D --> E[Click 'Shuffle & Pick Winner']
+    E --> F[Client animates through the list]
+    F --> G[AJAX gawg_pick_winner picks random server-side]
+    G --> H[Store winner post ID on the giveaway term]
+    H --> I[Status becomes 'Winner Drawn']
+    I --> J[Masked winner shown + read-only Winner field on term]
+```
+
+### Function arguments and response structure
+
+The `gawg_add_extra_entries` hook arguments:
+
+```mermaid
+flowchart LR
+    H["gawg_add_extra_entries $args"] --> A1["participant_uuid / participant_email — one required (uuid wins)"]
+    H --> A2["action_id — required, used in dedupe meta keys"]
+    H --> A3["message — required, logged to history"]
+    H --> A4["giveaway_uuid — optional, all active giveaways if omitted"]
+    H --> A5["entry_count — default 1"]
+    H --> A6["unique — default true"]
+    H --> A7["max_entries — default 10, non-unique cap"]
+    H --> RET["Action hook, no return value; result recorded in participant history"]
+```
+
+The `GAWG_Participant::get_giveaways_for_email( $email )` return structure:
+
+```mermaid
+flowchart LR
+    IN["get_giveaways_for_email(email)"] --> OUT["array of records — empty for unknown/empty email"]
+    OUT --> R[record]
+    R --> R1[giveaway_uuid : string]
+    R --> R2[giveaway_title : string]
+    R --> R3["status : active | closed | winner_drawn"]
+    R --> R4[status_label : string translated]
+    R --> R5[total_entries : int]
+    R --> R6[entries_by_source : array]
+    R6 --> S1[registered : int]
+    R6 --> S2[invite_visited : int]
+    R6 --> S3[invite_registered : int]
+    R6 --> S4[extra_entries : int]
+```
+
 ## Requirements
 - WordPress 6.0+
 - PHP 8.0+
@@ -116,6 +253,12 @@ Key lifecycle events (`registered`, `verification_email_sent`, `success_email_se
 A `gawg_add_extra_entries` WordPress action hook lets external plugins award additional entries to verified participants programmatically. The hook supports uniqueness enforcement (one award per giveaway per action ID), a configurable entry count, and a max-entries cap for repeatable awards.
 
 The `GAWG_Participant::get_giveaways_for_email( $email )` static method exposes a participant's giveaway participation as structured data for front-end "profile" pages. It returns an array of records — one per giveaway the email is entered in — each carrying the giveaway UUID and title, its status, the total entry count, and a per-source entry breakdown (registration base, unique-visit invite bonus, referred-registration invite bonus, and extra entries). It returns an empty array for unknown or empty emails and performs no ownership verification, so callers are responsible for authorizing access to the requested address.
+
+## Changelog
+
+### 1.0.0
+- First stable release.
+- Added Mermaid flowcharts documenting the registration, entries, linked entries, custom entries, and winner-picking flows, plus the `gawg_add_extra_entries` hook arguments and the `GAWG_Participant::get_giveaways_for_email()` response structure (in both this README and the **GAWG → Help** admin page).
 
 ## Development
 This project is maintained with the assistance of [Claude Code](https://claude.ai/code) and [CodeRabbit](https://coderabbit.ai).
