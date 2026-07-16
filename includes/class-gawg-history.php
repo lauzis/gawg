@@ -46,6 +46,42 @@ class GAWG_History {
 		return $entries;
 	}
 
+	/**
+	 * Render a read-only table of aggregated giveaway action logs.
+	 *
+	 * Accepts the flat array returned by GAWG_Participant::get_action_logs() and renders a
+	 * datetime / participant / action table. Used on the giveaway edit screen and the Draw
+	 * Winner page.
+	 *
+	 * @param array $logs Action-log records (newest first).
+	 */
+	public static function render_giveaway_log_table( $logs ) {
+		if ( empty( $logs ) ) {
+			echo '<p>' . esc_html__( 'No actions recorded yet.', 'gawg' ) . '</p>';
+			return;
+		}
+		?>
+		<table class="widefat striped" style="width:100%;">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Datetime (UTC)', 'gawg' ); ?></th>
+					<th><?php esc_html_e( 'Participant', 'gawg' ); ?></th>
+					<th><?php esc_html_e( 'Action', 'gawg' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $logs as $log ) : ?>
+				<tr>
+					<td style="font-family:monospace;"><?php echo esc_html( isset( $log['datetime'] ) ? $log['datetime'] : '' ); ?></td>
+					<td style="font-family:monospace;"><?php echo esc_html( isset( $log['participant_email'] ) ? $log['participant_email'] : '' ); ?></td>
+					<td style="font-family:monospace;"><?php echo esc_html( isset( $log['action'] ) ? $log['action'] : '' ); ?></td>
+				</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
+		<?php
+	}
+
 	public static function render_meta_box( $post ) {
 		$entries = self::get_all( $post->ID );
 		if ( empty( $entries ) ) {

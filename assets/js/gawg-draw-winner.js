@@ -8,6 +8,8 @@
 	var highlightedEl     = document.getElementById( 'gawg-highlighted-participant' );
 	var winnerWrap        = document.getElementById( 'gawg-winner-wrap' );
 	var winnerDisplay     = document.getElementById( 'gawg-winner-display' );
+	var logWrap           = document.getElementById( 'gawg-log-wrap' );
+	var logTable          = document.getElementById( 'gawg-log-table' );
 	var statusEl          = document.getElementById( 'gawg-status' );
 
 	var participants = [];
@@ -17,6 +19,8 @@
 
 		participantsWrap.style.display = 'none';
 		winnerWrap.style.display       = 'none';
+		logWrap.style.display          = 'none';
+		logTable.innerHTML             = '';
 		shuffleBtn.disabled            = true;
 		participants                   = [];
 		participantsList.innerHTML     = '';
@@ -42,7 +46,8 @@
 					statusEl.textContent = response.data || gawgDrawWinner.i18n.networkError;
 					return;
 				}
-				participants = response.data;
+				participants = ( response.data && response.data.participants ) || [];
+				renderLog( ( response.data && response.data.logs ) || [] );
 				if ( ! participants.length ) {
 					statusEl.textContent = gawgDrawWinner.i18n.noParticipants;
 					return;
@@ -65,6 +70,46 @@
 			li.style.padding = '2px 4px';
 			participantsList.appendChild( li );
 		} );
+	}
+
+	function renderLog( logs ) {
+		logTable.innerHTML = '';
+		logWrap.style.display = '';
+
+		if ( ! logs.length ) {
+			var p = document.createElement( 'p' );
+			p.textContent = gawgDrawWinner.i18n.noLogs;
+			logTable.appendChild( p );
+			return;
+		}
+
+		var table = document.createElement( 'table' );
+		table.className = 'widefat striped';
+		table.style.width = '100%';
+
+		var thead = document.createElement( 'thead' );
+		var headRow = document.createElement( 'tr' );
+		[ gawgDrawWinner.i18n.logDatetime, gawgDrawWinner.i18n.logParticipant, gawgDrawWinner.i18n.logAction ].forEach( function ( label ) {
+			var th = document.createElement( 'th' );
+			th.textContent = label;
+			headRow.appendChild( th );
+		} );
+		thead.appendChild( headRow );
+		table.appendChild( thead );
+
+		var tbody = document.createElement( 'tbody' );
+		logs.forEach( function ( log ) {
+			var tr = document.createElement( 'tr' );
+			[ log.datetime, log.participant_email, log.action ].forEach( function ( value ) {
+				var td = document.createElement( 'td' );
+				td.style.fontFamily = 'monospace';
+				td.textContent = value || '';
+				tr.appendChild( td );
+			} );
+			tbody.appendChild( tr );
+		} );
+		table.appendChild( tbody );
+		logTable.appendChild( table );
 	}
 
 	function highlightParticipant( index ) {

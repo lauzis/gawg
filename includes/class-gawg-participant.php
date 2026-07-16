@@ -287,6 +287,104 @@ class GAWG_Participant {
 	}
 
 	/**
+	 * Aggregate participant action-history entries for a single giveaway.
+	 *
+	 * Resolves the giveaway by its reference UUID, iterates the participant posts linked to it,
+	 * reads each participant's stored history_N action-log entries, and returns a flat array of
+	 * records sorted by timestamp descending (most recent first). When an $email is supplied the
+	 * aggregation is restricted to that participant's history only; when omitted every participant
+	 * in the giveaway (verified and unverified) is included across every tracked action type.
+	 *
+	 * This method produces no output and performs no ownership check on the supplied email, so the
+	 * caller is responsible for verifying that the visitor is entitled to view the requested data.
+	 *
+	 * Each element has the shape:
+	 *   array(
+	 *     'datetime'          => (string) ISO-8601 UTC timestamp of the action,
+	 *     'action'            => (string) action name (e.g. 'registered', 'verified'),
+	 *     'participant_email' => (string) participant email address,
+	 *     'participant_uuid'  => (string) participant reference UUID,
+	 *   )
+	 *
+	 * @param string $giveaway_uuid Giveaway reference UUID.
+	 * @param string $email         Optional email to restrict the log to a single participant.
+	 * @return array List of action-log records ordered newest-first; empty array for an unknown
+	 *               giveaway, an unmatched email, or a giveaway with no recorded actions.
+	 */
+	public static function get_action_logs( $giveaway_uuid, $email = '' ) {
+		$giveaway_uuid = sanitize_text_field( (string) $giveaway_uuid );
+		if ( '' === $giveaway_uuid ) {
+			return array();
+		}
+
+		$terms = get_terms( array(
+			'taxonomy'   => GAWG_Giveaway::TAXONOMY,
+			'hide_empty' => false,
+			'meta_query' => array(
+				array(
+					'key'   => GAWG_Giveaway::META_UUID,
+					'value' => $giveaway_uuid,
+				),
+			),
+			'number'     => 1,
+		) );
+
+		if ( is_wp_error( $terms ) || empty( $terms ) ) {
+			return array();
+		}
+
+		$term = $terms[0];
+
+		$query_args = array(
+			'post_type'      => self::POST_TYPE,
+			'post_status'    => 'publish',
+			'posts_per_page' => -1,
+			'tax_query'      => array(
+				array(
+					'taxonomy' => GAWG_Giveaway::TAXONOMY,
+					'field'    => 'term_id',
+					'terms'    => $term->term_id,
+				),
+			),
+		);
+
+		$email = strtolower( sanitize_email( (string) $email ) );
+		if ( '' !== $email ) {
+			if ( ! is_email( $email ) ) {
+				return array();
+			}
+			$query_args['title'] = $email;
+		}
+
+		$participants = get_posts( $query_args );
+		if ( empty( $participants ) ) {
+			return array();
+		}
+
+		$logs = array();
+		foreach ( $participants as $participant ) {
+			$participant_uuid = (string) get_post_meta( $participant->ID, self::META_UUID, true );
+			foreach ( GAWG_History::get_all( $participant->ID ) as $entry ) {
+				$logs[] = array(
+					'datetime'          => isset( $entry['datetime'] ) ? (string) $entry['datetime'] : '',
+					'action'            => isset( $entry['action'] ) ? (string) $entry['action'] : '',
+					'participant_email' => $participant->post_title,
+					'participant_uuid'  => $participant_uuid,
+				);
+			}
+		}
+
+		usort(
+			$logs,
+			function( $a, $b ) {
+				return strcmp( (string) $b['datetime'], (string) $a['datetime'] );
+			}
+		);
+
+		return $logs;
+	}
+
+	/**
 	 * Reconstruct an entry breakdown by source from a participant's stored meta.
 	 *
 	 * @param int    $participant_id      Participant post ID.

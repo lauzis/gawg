@@ -24,6 +24,7 @@ class GAWG_Admin {
 		'history_invite_visited_recorded'     => 'History: Invite Visited Is Recorded',
 		'history_invite_registered_recorded'  => 'History: Invite Registered Is Recorded',
 		'giveaways_for_email_breakdown'       => 'Get Giveaways For Email Returns Entry Breakdown',
+		'action_logs_aggregated'              => 'Get Action Logs Aggregates Giveaway History',
 	);
 
 	public static function init() {
@@ -115,6 +116,10 @@ class GAWG_Admin {
 					'shuffling'      => __( 'Shuffling…', 'gawg' ),
 					'networkError'   => __( 'A network error occurred. Please try again.', 'gawg' ),
 					'selectGiveaway' => __( 'Please select a giveaway.', 'gawg' ),
+					'logDatetime'    => __( 'Datetime (UTC)', 'gawg' ),
+					'logParticipant' => __( 'Participant', 'gawg' ),
+					'logAction'      => __( 'Action', 'gawg' ),
+					'noLogs'         => __( 'No actions recorded yet.', 'gawg' ),
 				),
 			)
 		);
@@ -208,6 +213,11 @@ class GAWG_Admin {
 				<div id="gawg-winner-display" style="font-size:32px;font-weight:bold;font-family:monospace;color:#2271b1;"></div>
 			</div>
 
+			<div id="gawg-log-wrap" style="display:none;margin-top:20px;">
+				<h2><?php esc_html_e( 'Action Log', 'gawg' ); ?></h2>
+				<div id="gawg-log-table"></div>
+			</div>
+
 			<div id="gawg-status" style="margin-top:10px;color:#666;"></div>
 		</div>
 		<?php
@@ -251,7 +261,18 @@ class GAWG_Admin {
 			);
 		}
 
-		wp_send_json_success( $participants );
+		$giveaway_uuid = (string) get_term_meta( $term_id, GAWG_Giveaway::META_UUID, true );
+		$logs          = '' !== $giveaway_uuid ? GAWG_Participant::get_action_logs( $giveaway_uuid ) : array();
+
+		foreach ( $logs as &$log ) {
+			$log['participant_email'] = self::mask_email( $log['participant_email'] );
+		}
+		unset( $log );
+
+		wp_send_json_success( array(
+			'participants' => $participants,
+			'logs'         => $logs,
+		) );
 	}
 
 	public static function ajax_pick_winner() {
@@ -483,6 +504,9 @@ class GAWG_Admin {
 					break;
 				case 'giveaways_for_email_breakdown':
 					$results[] = self::test_giveaways_for_email_breakdown();
+					break;
+				case 'action_logs_aggregated':
+					$results[] = self::test_action_logs_aggregated();
 					break;
 			}
 		}
@@ -1022,6 +1046,42 @@ foreach ( $giveaways as $giveaway ) {
         (int) $giveaway['total_entries']
     );
 }</code></pre>
+
+			<hr>
+
+			<h2><?php esc_html_e( 'Listing all actions in a giveaway', 'gawg' ); ?></h2>
+			<p>
+				<?php esc_html_e( 'To list every recorded action across a whole giveaway, call the GAWG_Participant::get_action_logs() helper with the giveaway\'s reference UUID. It aggregates the per-participant action history into a single flat array sorted newest-first. The same data backs the read-only Action Log table shown on the giveaway edit screen and on the Draw Winner page.', 'gawg' ); ?>
+			</p>
+			<p>
+				<?php esc_html_e( 'Pass an optional email as the second argument to restrict the result to that single participant\'s history; omit it to include every participant (verified and unverified) across every tracked action type.', 'gawg' ); ?>
+			</p>
+			<p>
+				<strong><?php esc_html_e( 'Privacy note:', 'gawg' ); ?></strong>
+				<?php esc_html_e( 'This function performs no ownership check on the email address. Only call it with data the current visitor is entitled to see.', 'gawg' ); ?>
+			</p>
+			<h3><?php esc_html_e( 'Return shape', 'gawg' ); ?></h3>
+			<p><?php esc_html_e( 'An array of records (empty for an unknown giveaway, an unmatched email, or a giveaway with no recorded actions), each shaped like:', 'gawg' ); ?></p>
+			<pre><code>array(
+    'datetime'          => '2026-07-16T14:05:18+00:00', // ISO-8601 UTC
+    'action'            => 'verified',
+    'participant_email' => 'user@example.com',
+    'participant_uuid'  => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx',
+)</code></pre>
+			<h3><?php esc_html_e( 'Example', 'gawg' ); ?></h3>
+			<pre><code>$logs = GAWG_Participant::get_action_logs( $giveaway_uuid );
+
+foreach ( $logs as $log ) {
+    printf(
+        '%s — %s by %s',
+        esc_html( $log['datetime'] ),
+        esc_html( $log['action'] ),
+        esc_html( $log['participant_email'] )
+    );
+}
+
+// Just one participant's actions:
+$user_logs = GAWG_Participant::get_action_logs( $giveaway_uuid, 'user@example.com' );</code></pre>
 
 		</div>
 		<?php
@@ -1845,6 +1905,84 @@ foreach ( $giveaways as $giveaway ) {
 
 		$result['pass']    = true;
 		$result['message'] = 'Returned correct entry breakdown and status for email.';
+		return $result;
+	}
+
+	private static function test_action_logs_aggregated() {
+		$result = array(
+			'id'      => 'action_logs_aggregated',
+			'name'    => 'Get Action Logs Aggregates Giveaway History',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$term_id       = $setup['term_id'];
+		$giveaway_uuid = $setup['giveaway_uuid'];
+
+		// First participant with two actions.
+		$post_a = $setup['post_id'];
+		$email_a = 'gawg-log-a-' . md5( $giveaway_uuid ) . '@example.com'; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_md5
+		wp_update_post( array( 'ID' => $post_a, 'post_title' => $email_a ) );
+		GAWG_History::append( $post_a, 'registered' );
+		GAWG_History::append( $post_a, 'verified' );
+
+		// Second participant in the same giveaway with one action.
+		$email_b = 'gawg-log-b-' . md5( $giveaway_uuid ) . '@example.com'; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_md5
+		$post_b  = wp_insert_post( array(
+			'post_title'  => $email_b,
+			'post_type'   => GAWG_Participant::POST_TYPE,
+			'post_status' => 'publish',
+		), true );
+		if ( is_wp_error( $post_b ) ) {
+			wp_delete_post( $post_a, true );
+			wp_delete_term( $term_id, GAWG_Giveaway::TAXONOMY );
+			$result['message'] = 'Failed to insert second participant: ' . $post_b->get_error_message();
+			return $result;
+		}
+		update_post_meta( $post_b, self::META_TEST_FLAG, '1' );
+		wp_set_object_terms( $post_b, $term_id, GAWG_Giveaway::TAXONOMY );
+		GAWG_History::append( $post_b, 'registered' );
+
+		$all       = GAWG_Participant::get_action_logs( $giveaway_uuid );
+		$only_a    = GAWG_Participant::get_action_logs( $giveaway_uuid, $email_a );
+
+		wp_delete_post( $post_a, true );
+		wp_delete_post( $post_b, true );
+		wp_delete_term( $term_id, GAWG_Giveaway::TAXONOMY );
+
+		if ( 3 !== count( $all ) ) {
+			$result['message'] = 'Expected 3 aggregated log records, got ' . count( $all );
+			return $result;
+		}
+
+		// Records must be sorted by datetime descending.
+		for ( $i = 1; $i < count( $all ); $i++ ) {
+			if ( strcmp( (string) $all[ $i - 1 ]['datetime'], (string) $all[ $i ]['datetime'] ) < 0 ) {
+				$result['message'] = 'Records are not sorted newest-first.';
+				return $result;
+			}
+		}
+
+		// Email filter must restrict to that participant only.
+		if ( 2 !== count( $only_a ) ) {
+			$result['message'] = 'Expected 2 records for filtered email, got ' . count( $only_a );
+			return $result;
+		}
+		foreach ( $only_a as $log ) {
+			if ( $log['participant_email'] !== $email_a ) {
+				$result['message'] = 'Email filter leaked another participant: ' . $log['participant_email'];
+				return $result;
+			}
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Aggregated all participants and filtered by email correctly.';
 		return $result;
 	}
 
