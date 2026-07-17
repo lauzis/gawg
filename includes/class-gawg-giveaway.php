@@ -25,6 +25,7 @@ class GAWG_Giveaway {
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_registration_dates_field_edit' ) );
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_winner_field_edit' ) );
 		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_closed_field_edit' ) );
+		add_action( self::TAXONOMY . '_edit_form_fields', array( __CLASS__, 'render_action_log_field_edit' ), 20 );
 		add_filter( 'manage_edit-' . self::TAXONOMY . '_columns',          array( __CLASS__, 'add_status_column' ) );
 		add_filter( 'manage_' . self::TAXONOMY . '_custom_column',         array( __CLASS__, 'render_status_column' ), 10, 3 );
 		add_filter( 'manage_edit-' . self::TAXONOMY . '_sortable_columns', array( __CLASS__, 'make_status_column_sortable' ) );
@@ -354,6 +355,28 @@ class GAWG_Giveaway {
 		$clauses['orderby'] = "ORDER BY CASE WHEN CAST(IFNULL(gawg_tm_winner.meta_value,'0') AS UNSIGNED) > 0 THEN 2 WHEN gawg_tm_closed.meta_value = '1' THEN 1 ELSE 0 END {$order}";
 
 		return $clauses;
+	}
+
+	/**
+	 * Render a read-only action log for every participant in this giveaway on its edit screen.
+	 *
+	 * @param WP_Term $term Giveaway term being edited.
+	 */
+	public static function render_action_log_field_edit( $term ) {
+		$uuid = (string) get_term_meta( $term->term_id, self::META_UUID, true );
+		if ( '' === $uuid ) {
+			return;
+		}
+		$logs = GAWG_Participant::get_action_logs( $uuid );
+		?>
+		<tr class="form-field">
+			<th scope="row"><label><?php esc_html_e( 'Action Log', 'gawg' ); ?></label></th>
+			<td>
+				<?php GAWG_History::render_giveaway_log_table( $logs ); ?>
+				<p class="description"><?php esc_html_e( 'Every recorded action for all participants in this giveaway, most recent first.', 'gawg' ); ?></p>
+			</td>
+		</tr>
+		<?php
 	}
 
 	public static function render_uuid_field_edit( $term ) {

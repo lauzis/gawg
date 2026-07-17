@@ -27,10 +27,11 @@ It could be useful for anyone running small giveaways on a WordPress site withou
 - **Participant action history** — each significant event in a participant's lifecycle is automatically recorded as a timestamped post meta entry (`history_1`, `history_2`, …). Tracked actions: `registered`, `verification_email_sent`, `success_email_sent`, `verified`, `invite_visited`, `invite_registered`, `invite_verified`, and any `extra_entries` events fired via the custom hook. The full history is displayed in a read-only table at the bottom of each participant's edit screen in the admin.
 - **`gawg_add_extra_entries` action hook** — third-party plugins (e.g. Gravity Forms, WooCommerce) can fire `do_action('gawg_add_extra_entries', $args)` to programmatically award bonus entries to a verified participant. Accepts a participant UUID or email, a required action identifier (used for deduplication meta keys), a message logged to participant history, an optional giveaway UUID (targets all active giveaways when omitted), an entry count (default 1), a uniqueness flag (default `true` — award once per giveaway), and a max-entries cap for non-unique mode (default 10).
 - **`GAWG_Participant::get_giveaways_for_email()` API** — a public static helper for rendering a participant's giveaway participation on a front-end "profile" page. Given an email address it returns a plain array of associative arrays (empty for an unknown or empty email), one per giveaway the address is entered in, each containing `giveaway_uuid`, `giveaway_title`, `status` (`active` / `closed` / `winner_drawn`) plus a translated `status_label`, `total_entries`, and an `entries_by_source` breakdown (`registered`, `invite_visited`, `invite_registered`, `extra_entries`) derived from the stored entry-count meta rather than the action history log. The function performs no ownership check on the email, so callers must confirm the visitor is entitled to view the requested address's data.
+- **`GAWG_Participant::get_action_logs()` API** — a public static helper for listing action-history events across a whole giveaway. Given a giveaway reference UUID (and an optional email) it resolves the giveaway, iterates its participant posts, reads the existing per-participant `history_N` entries, and returns a flat array of records — one per recorded action — each containing `datetime` (ISO-8601 UTC), `action`, `participant_email`, and `participant_uuid`, sorted by timestamp descending (most recent first). Passing only the UUID aggregates every participant (verified and unverified) across every tracked action type; passing an email restricts the result to that single participant's history. It returns an empty array for an unknown giveaway, an unmatched email, or a giveaway with no recorded actions, and performs no ownership check, so callers are responsible for authorizing access. The giveaway-level log is surfaced read-only as an **Action Log** table on the giveaway's taxonomy edit screen and on the **Draw Winner** page for the selected giveaway.
 - **Admin UI** — a dedicated GAWG menu in the WordPress admin with:
   - **Participants** — list and manage all participant posts. Each participant's edit screen shows an **Action History** table at the bottom listing every recorded event with its UTC timestamp and action name.
-  - **Giveaways** — list and manage all giveaway taxonomy terms. Each term's edit screen shows a read-only **Winner** field once a winner has been drawn, a **Closed for Participants** checkbox to manually open or close the giveaway, **Registration Opens** and **Registration Closes** datetime fields for automatic date-gating, and a **Rules URL** field used in success emails. The list table includes a sortable **Status** column (Active / Closed / Winner Drawn).
-  - **Draw Winner** page — select a giveaway, shuffle participants, and pick a winner at random.
+  - **Giveaways** — list and manage all giveaway taxonomy terms. Each term's edit screen shows a read-only **Winner** field once a winner has been drawn, a **Closed for Participants** checkbox to manually open or close the giveaway, **Registration Opens** and **Registration Closes** datetime fields for automatic date-gating, a **Rules URL** field used in success emails, and a read-only **Action Log** table aggregating every recorded action for all participants in the giveaway (most recent first). The list table includes a sortable **Status** column (Active / Closed / Winner Drawn).
+  - **Draw Winner** page — select a giveaway, shuffle participants, and pick a winner at random. Selecting a giveaway also loads its **Action Log** (masked participant emails) beneath the participant list.
   - **Self Tests** page — run built-in verification checks (e.g. UUID generation, email verification logic, action history recording) directly from the admin panel.
   - **Help** page — step-by-step instructions for creating giveaways, adding participants, embedding the entry form, and configuring email verification.
   - **Settings** page — configure plugin-wide options: Google reCAPTCHA keys, extra entries for unique visit (default 1), extra entries for registration after visit (default 1), and HTML email templates for verification and success emails.
@@ -172,6 +173,26 @@ flowchart LR
     R6 --> S4[extra_entries : int]
 ```
 
+The `GAWG_Participant::get_action_logs( $giveaway_uuid, $email = '' )` aggregation and return structure:
+
+```mermaid
+flowchart LR
+    IN["get_action_logs(giveaway_uuid, email?)"] --> D{Giveaway UUID resolves?}
+    D -- No --> E["[] empty array"]
+    D -- Yes --> P{email supplied?}
+    P -- Yes --> P1[Restrict to that participant]
+    P -- No --> P2[All participants in giveaway]
+    P1 --> AGG[Read history_N meta per participant]
+    P2 --> AGG
+    AGG --> SORT[Sort by datetime DESC]
+    SORT --> OUT["array of records — newest first"]
+    OUT --> R[record]
+    R --> R1[datetime : string ISO-8601 UTC]
+    R --> R2[action : string]
+    R --> R3[participant_email : string]
+    R --> R4[participant_uuid : string]
+```
+
 ## Requirements
 - WordPress 6.0+
 - PHP 8.0+
@@ -246,13 +267,15 @@ The **Draw Winner** admin page lets you select an active giveaway, view particip
 
 **Participant action history**
 
-Key lifecycle events (`registered`, `verification_email_sent`, `success_email_sent`, `verified`, `invite_visited`, `invite_registered`, `invite_verified`) are automatically appended as timestamped post meta entries and displayed in a read-only **Action History** table on each participant's edit screen.
+Key lifecycle events (`registered`, `verification_email_sent`, `success_email_sent`, `verified`, `invite_visited`, `invite_registered`, `invite_verified`) are automatically appended as timestamped post meta entries and displayed in a read-only **Action History** table on each participant's edit screen. These per-participant logs can be aggregated across a whole giveaway via `GAWG_Participant::get_action_logs()`, which powers the read-only **Action Log** tables shown on the giveaway edit screen and the Draw Winner page.
 
 **Extensibility**
 
 A `gawg_add_extra_entries` WordPress action hook lets external plugins award additional entries to verified participants programmatically. The hook supports uniqueness enforcement (one award per giveaway per action ID), a configurable entry count, and a max-entries cap for repeatable awards.
 
 The `GAWG_Participant::get_giveaways_for_email( $email )` static method exposes a participant's giveaway participation as structured data for front-end "profile" pages. It returns an array of records — one per giveaway the email is entered in — each carrying the giveaway UUID and title, its status, the total entry count, and a per-source entry breakdown (registration base, unique-visit invite bonus, referred-registration invite bonus, and extra entries). It returns an empty array for unknown or empty emails and performs no ownership verification, so callers are responsible for authorizing access to the requested address.
+
+The `GAWG_Participant::get_action_logs( $giveaway_uuid, $email = '' )` static method aggregates the per-participant action history across a whole giveaway. It resolves the giveaway by its reference UUID, reads each linked participant's `history_N` entries, and returns a flat array of records (`datetime`, `action`, `participant_email`, `participant_uuid`) sorted newest-first. Passing only the UUID includes every participant; passing an email restricts the result to that single participant. It returns an empty array for unknown giveaways or unmatched emails and performs no ownership check. This function backs the read-only **Action Log** tables on the giveaway edit screen and the Draw Winner page.
 
 ## Changelog
 
