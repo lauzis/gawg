@@ -1,0 +1,60 @@
+{
+  "sections": [
+    {
+      "id": "recaptcha",
+      "title": "Google reCAPTCHA v2",
+      "fields": [
+        {
+          "id": "recaptcha_site_key",
+          "type": "text",
+          "title": "Site Key",
+          "help_text": "The site key (public key) from your Google reCAPTCHA v2 admin panel."
+        },
+        {
+          "id": "recaptcha_secret_key",
+          "type": "text",
+          "title": "Secret Key",
+          "help_text": "The secret key (private key) from your Google reCAPTCHA v2 admin panel."
+        }
+      ]
+    },
+    {
+      "id": "extra_entries",
+      "title": "Extra Entries",
+      "fields": [
+        {
+          "id": "extra_entries_unique_visit",
+          "type": "text",
+          "title": "Extra entries for unique visit",
+          "attributes": { "type": "number", "min": "0" },
+          "help_text": "Entries awarded to an inviter when a unique visitor clicks their invite link. Default: 1."
+        },
+        {
+          "id": "extra_entries_registration",
+          "type": "text",
+          "title": "Extra entries for registration after visit",
+          "attributes": { "type": "number", "min": "0" },
+          "help_text": "Entries awarded to an inviter when a visitor they referred completes registration. Default: 1."
+        }
+      ]
+    },
+    {
+      "id": "email_templates",
+      "title": "Email Templates",
+      "fields": [
+        {
+          "id": "email_verification",
+          "type": "textarea",
+          "title": "Verification Email Template (HTML)",
+          "help_text": "Sent when a new participant registers and must verify their email. Available placeholders: {participant_email}, {giveaway_title}, {verification_link}"
+        },
+        {
+          "id": "email_success",
+          "type": "textarea",
+          "title": "Registration Success Email Template (HTML)",
+          "help_text": "Sent after a participant successfully verifies their email. Available placeholders: {participant_email}, {giveaway_title}, {rules_url}"
+        }
+      ]
+    }
+  ]
+}

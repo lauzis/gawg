@@ -91,6 +91,42 @@ class GAWG_Admin {
 			'gawg-help',
 			array( __CLASS__, 'render_help_page' )
 		);
+
+		// Hidden while logging is off, since there would be nothing to show.
+		// The page callback keeps its own capability check.
+		if ( GAWG_Logs::enabled() ) {
+			add_submenu_page(
+				'gawg',
+				__( 'Logs', 'gawg' ),
+				__( 'Logs', 'gawg' ),
+				'manage_options',
+				'gawg-logs',
+				array( __CLASS__, 'render_logs_page' )
+			);
+		}
+	}
+
+	/** Renders the general log: one day per view, newest entry first. */
+	public static function render_logs_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		if (
+			isset( $_POST['action'], $_POST['gawg_clear_logs_nonce'] )
+			&& 'clear_logs' === $_POST['action']
+			&& wp_verify_nonce( sanitize_key( wp_unslash( $_POST['gawg_clear_logs_nonce'] ) ), 'gawg_clear_logs' )
+		) {
+			GAWG_Logs::clear();
+		}
+
+		$files     = GAWG_Logs::files();
+		$dates     = wp_list_pluck( $files, 'date' );
+		$requested = isset( $_GET['log_date'] ) ? sanitize_key( wp_unslash( $_GET['log_date'] ) ) : '';
+		$selected  = in_array( $requested, $dates, true ) ? $requested : ( isset( $dates[0] ) ? $dates[0] : '' );
+		$lines     = '' === $selected ? array() : GAWG_Logs::read( $selected );
+
+		require GAWG_PLUGIN_DIR . 'templates/logs.php';
 	}
 
 	public static function enqueue_draw_winner_scripts( $hook ) {

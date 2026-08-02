@@ -100,6 +100,12 @@ class GAWG_Extra_Entries {
 			update_post_meta( $participant_id, $flag_key, 'true' );
 			self::increment_entries( $participant_id, $ga_uuid, $entry_count );
 			GAWG_History::append( $participant_id, 'extra_entries: ' . $message );
+			GAWG_Logs::add( 'entries', 'Extra entries awarded.', array(
+				'participant' => $participant_id,
+				'giveaway'    => $ga_uuid,
+				'entries'     => $entry_count,
+				'reason'      => $message,
+			) );
 		}
 	}
 

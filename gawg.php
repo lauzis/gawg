@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GAWG — GiveAway Winner Generator
  * Description: Create giveaways, collect applicant entries, and run a lottery to pick winners.
- * Version:     1.0.0
+ * Version:     1.1.0
  * Author:      Aivars Lauzis
  * License:     GPL-2.0+
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -11,12 +11,24 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'GAWG_VERSION',    '1.0.0' );
+define( 'GAWG_VERSION',    '1.1.0' );
 define( 'GAWG_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GAWG_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-require_once GAWG_PLUGIN_DIR . 'vendor/autoload.php';
+if ( ! defined( 'GAWG_LOG_PATH' ) ) {
+	// Under uploads/, never inside the plugin directory: WordPress deletes and
+	// re-extracts that folder on every update, which would take the logs too.
+	$gawg_uploads = wp_upload_dir();
+	define( 'GAWG_LOG_PATH', str_replace( '\\', '/', $gawg_uploads['basedir'] ) . '/gawg-logs/' );
+	unset( $gawg_uploads );
+}
 
+require_once GAWG_PLUGIN_DIR . 'vendor/autoload.php';
+// Required explicitly: Composer's files autoload runs only one copy of this
+// package per request, so the version gate would never see the others.
+require_once GAWG_PLUGIN_DIR . 'vendor/lauzis/wp-plugin-packages/bootstrap.php';
+
+require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-logs.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-history.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-participant.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-giveaway.php';

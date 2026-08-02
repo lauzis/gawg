@@ -37,7 +37,19 @@ class GAWG_Mailer {
 		$subject = sprintf( __( 'Please verify your email for %s', 'gawg' ), $giveaway_title );
 
 		$sent = wp_mail( $email, $subject, $body, array( 'Content-Type: text/html; charset=UTF-8' ) );
-		GAWG_History::append( $participant_id, 'verification_email_sent' );
+
+		if ( $sent ) {
+			GAWG_History::append( $participant_id, 'verification_email_sent' );
+			GAWG_Logs::add( 'mail', 'Verification email sent.', array( 'participant' => $participant_id, 'giveaway' => $giveaway_title ) );
+		} else {
+			// wp_mail() returning false was previously discarded, and the
+			// history still recorded the mail as sent. An entrant who never
+			// receives this cannot enter, so it is a fairness problem rather
+			// than a cosmetic one — recorded either way, and to PHP's error log.
+			GAWG_History::append( $participant_id, 'verification_email_failed' );
+			GAWG_Logs::error( 'mail', 'Verification email could not be sent.', array( 'participant' => $participant_id, 'giveaway' => $giveaway_title ) );
+		}
+
 		return $sent;
 	}
 
@@ -64,7 +76,15 @@ class GAWG_Mailer {
 		$subject = sprintf( __( 'You are registered for %s', 'gawg' ), $giveaway_title );
 
 		$sent = wp_mail( $email, $subject, $body, array( 'Content-Type: text/html; charset=UTF-8' ) );
-		GAWG_History::append( $participant_id, 'success_email_sent' );
+
+		if ( $sent ) {
+			GAWG_History::append( $participant_id, 'success_email_sent' );
+			GAWG_Logs::add( 'mail', 'Success email sent.', array( 'participant' => $participant_id ) );
+		} else {
+			GAWG_History::append( $participant_id, 'success_email_failed' );
+			GAWG_Logs::error( 'mail', 'Success email could not be sent.', array( 'participant' => $participant_id ) );
+		}
+
 		return $sent;
 	}
 
