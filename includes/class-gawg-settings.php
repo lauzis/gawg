@@ -49,8 +49,15 @@ class GAWG_Settings {
 		$page->register(
 			GAWG_PLUGIN_DIR . 'config/settings.json',
 			array(
-				'prefix' => self::PREFIX,
-				'domain' => 'gawg',
+				'prefix'   => self::PREFIX,
+				'domain'   => 'gawg',
+				// Supplied here rather than in the JSON because default values
+				// are not visited by the translation manifest, and these are
+				// the only defaults containing prose an entrant will read.
+				'defaults' => array(
+					'email_verification' => self::default_verification_template(),
+					'email_success'      => self::default_success_template(),
+				),
 			)
 		);
 
@@ -101,10 +108,50 @@ class GAWG_Settings {
 	}
 
 	public static function get_email_verification_template() {
-		return wp_kses_post( (string) self::get( 'email_verification' ) );
+		$template = trim( (string) self::get( 'email_verification' ) );
+
+		// Falls back rather than returning empty: without this template no
+		// entrant can ever verify, so an unconfigured site is a broken site.
+		// The settings field is pre-filled with the same text to edit.
+		if ( '' === $template ) {
+			$template = self::default_verification_template();
+		}
+
+		return wp_kses_post( $template );
 	}
 
 	public static function get_email_success_template() {
-		return wp_kses_post( (string) self::get( 'email_success' ) );
+		$template = trim( (string) self::get( 'email_success' ) );
+
+		if ( '' === $template ) {
+			$template = self::default_success_template();
+		}
+
+		return wp_kses_post( $template );
+	}
+
+	/** The verification email as shipped. Placeholders match the help text. */
+	public static function default_verification_template() {
+		return '<p>' . __( 'Hello,', 'gawg' ) . '</p>'
+			. '<p>' . sprintf(
+				/* translators: %s: giveaway title placeholder, replaced when the mail is sent */
+				__( 'Thank you for entering %s. Please confirm your email address to complete your entry.', 'gawg' ),
+				'{giveaway_title}'
+			) . '</p>'
+			. '<p><a href="{verification_link}">' . __( 'Confirm my entry', 'gawg' ) . '</a></p>'
+			. '<p>' . __( 'If you did not enter this giveaway, you can ignore this email.', 'gawg' ) . '</p>';
+	}
+
+	/** The post-verification confirmation email as shipped. */
+	public static function default_success_template() {
+		return '<p>' . __( 'Hello,', 'gawg' ) . '</p>'
+			. '<p>' . sprintf(
+				/* translators: %s: giveaway title placeholder, replaced when the mail is sent */
+				__( 'Your entry to %s is confirmed. Good luck!', 'gawg' ),
+				'{giveaway_title}'
+			) . '</p>';
+		// {rules_url} is deliberately absent: it is optional per giveaway, and
+		// an unset one would render as a link to nowhere in every mail sent.
+		// The help text documents it for admins who do set one.
 	}
 }

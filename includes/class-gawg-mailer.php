@@ -17,10 +17,19 @@ class GAWG_Mailer {
 			home_url( '/' )
 		);
 
-		update_post_meta( $participant_id, GAWG_Participant::META_VERIFICATION_SENT_AT, time() );
-
 		$template = GAWG_Settings::get_email_verification_template();
+
 		if ( '' === $template ) {
+			// Nothing was configured, so nothing goes out and the entrant can
+			// never verify. Silence made this look like a working giveaway
+			// collecting entries that could never be completed.
+			GAWG_History::append( $participant_id, 'verification_email_failed' );
+			GAWG_Logs::error(
+				'mail',
+				'No verification email template is configured, so no verification email was sent.',
+				array( 'participant' => $participant_id, 'giveaway' => $giveaway_title )
+			);
+
 			return false;
 		}
 
@@ -39,6 +48,11 @@ class GAWG_Mailer {
 		$sent = wp_mail( $email, $subject, $body, array( 'Content-Type: text/html; charset=UTF-8' ) );
 
 		if ( $sent ) {
+			// Stamped here rather than before the send: this timestamp starts
+			// the link's 24-hour expiry clock, so setting it for mail that
+			// never left expires a link the entrant was never given.
+			update_post_meta( $participant_id, GAWG_Participant::META_VERIFICATION_SENT_AT, time() );
+
 			GAWG_History::append( $participant_id, 'verification_email_sent' );
 			GAWG_Logs::add( 'mail', 'Verification email sent.', array( 'participant' => $participant_id, 'giveaway' => $giveaway_title ) );
 		} else {
@@ -59,7 +73,15 @@ class GAWG_Mailer {
 		$rules_url      = (string) get_term_meta( $giveaway_term->term_id, GAWG_Giveaway::META_RULES_URL, true );
 
 		$template = GAWG_Settings::get_email_success_template();
+
 		if ( '' === $template ) {
+			GAWG_History::append( $participant_id, 'success_email_failed' );
+			GAWG_Logs::error(
+				'mail',
+				'No success email template is configured, so no confirmation was sent.',
+				array( 'participant' => $participant_id, 'giveaway' => $giveaway_title )
+			);
+
 			return false;
 		}
 

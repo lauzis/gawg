@@ -15,6 +15,7 @@ class GAWG_Admin {
 		'new_ip_increments_entries'           => 'New IP Increments Entry Count',
 		'duplicate_ip_no_increment'           => 'Duplicate IP Does Not Double-Increment Entries',
 		'verification_sent_at_set'            => 'Verification Email Sets Sent-At Timestamp',
+		'failed_send_leaves_clock_unset'      => 'Failed Verification Email Does Not Start Expiry Clock',
 		'verification_sets_verified_flag'     => 'Verification Link Sets Verified Flag',
 		'expired_verification_detected'       => 'Expired Verification Link Is Detected',
 		'already_verified_skips_reverify'     => 'Already-Verified Participant Is Not Re-Verified',
@@ -514,6 +515,9 @@ class GAWG_Admin {
 				case 'verification_sent_at_set':
 					$results[] = self::test_verification_sent_at_set();
 					break;
+				case 'failed_send_leaves_clock_unset':
+					$results[] = self::test_failed_send_leaves_clock_unset();
+					break;
 				case 'verification_sets_verified_flag':
 					$results[] = self::test_verification_sets_verified_flag();
 					break;
@@ -577,8 +581,10 @@ flowchart TD
     D -- Yes --> R3[Show 'already in the list']
     D -- No --> E[Create gawg_participant post + UUID]
     E --> F[Log 'registered' + record base entry]
-    F --> G[Send verification email + log 'verification_email_sent']
-    G --> H[Participant clicks link]
+    F --> G{Verification email sent?}
+    G -- No --> R4[Log 'verification_email_failed'<br/>expiry clock NOT started]
+    G -- Yes --> G2[Log 'verification_email_sent'<br/>start 24h expiry clock]
+    G2 --> H[Participant clicks link]
     H --> I{Link expired 24h?}
     I -- Yes --> J[Error page + Resend verification button]
     I -- No --> K[Mark verified + log 'verified']
@@ -964,7 +970,9 @@ flowchart LR
 			<ul>
 				<li><strong>registered</strong> — <?php esc_html_e( 'Participant submitted the entry form and their post was created.', 'gawg' ); ?></li>
 				<li><strong>verification_email_sent</strong> — <?php esc_html_e( 'A verification email was dispatched to the participant (initial send or resend).', 'gawg' ); ?></li>
+				<li><strong>verification_email_failed</strong> — <?php esc_html_e( 'The verification email could not be sent. This participant has not been able to verify and will need a resend once the cause is fixed — check the logs for the reason.', 'gawg' ); ?></li>
 				<li><strong>success_email_sent</strong> — <?php esc_html_e( 'A success confirmation email was sent after the participant verified their address.', 'gawg' ); ?></li>
+				<li><strong>success_email_failed</strong> — <?php esc_html_e( 'The confirmation email could not be sent. The entry itself is still valid; only the confirmation did not arrive.', 'gawg' ); ?></li>
 				<li><strong>verified</strong> — <?php esc_html_e( 'Participant clicked the verification link and their email was confirmed.', 'gawg' ); ?></li>
 				<li><strong>invite_visited</strong> — <?php esc_html_e( 'A new unique IP address visited via this participant\'s invite link (bonus entry awarded).', 'gawg' ); ?></li>
 				<li><strong>invite_registered</strong> — <?php esc_html_e( 'Someone referred via this participant\'s invite link completed registration (bonus entry awarded to this participant as inviter).', 'gawg' ); ?></li>
@@ -1704,6 +1712,60 @@ $user_logs = GAWG_Participant::get_action_logs( $giveaway_uuid, 'user@example.co
 
 		$result['pass']    = true;
 		$result['message'] = 'history_1 action = "registered" correctly recorded.';
+		return $result;
+	}
+
+	/**
+	 * The timestamp starts the verification link's 24-hour expiry, so setting
+	 * it for mail that never left gives the entrant a window they cannot use
+	 * and no way to tell. Companion to verification_sent_at_set, which only
+	 * ever covered the success path — which is how this went unnoticed.
+	 */
+	private static function test_failed_send_leaves_clock_unset() {
+		$result = array(
+			'id'      => 'failed_send_leaves_clock_unset',
+			'name'    => 'Failed Verification Email Does Not Start Expiry Clock',
+			'pass'    => false,
+			'message' => '',
+		);
+
+		$setup = self::make_test_participant_in_giveaway();
+		if ( isset( $setup['error'] ) ) {
+			$result['message'] = $setup['error'];
+			return $result;
+		}
+
+		$post_id = $setup['post_id'];
+		$term    = get_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		// Refusing the send is what a real mail failure looks like from here.
+		add_filter( 'pre_wp_mail', '__return_false', 0 );
+		$sent = GAWG_Mailer::send_verification_email( $post_id, $term );
+		remove_filter( 'pre_wp_mail', '__return_false', 0 );
+
+		$sent_at = (int) get_post_meta( $post_id, GAWG_Participant::META_VERIFICATION_SENT_AT, true );
+		$actions = array_column( GAWG_History::get_all( $post_id ), 'action' );
+
+		wp_delete_post( $post_id, true );
+		wp_delete_term( $setup['term_id'], GAWG_Giveaway::TAXONOMY );
+
+		if ( false !== $sent ) {
+			$result['message'] = 'send_verification_email should have reported failure, returned ' . var_export( $sent, true ) . '.';
+			return $result;
+		}
+
+		if ( $sent_at > 0 ) {
+			$result['message'] = 'The expiry clock was started despite the send failing.';
+			return $result;
+		}
+
+		if ( ! in_array( 'verification_email_failed', $actions, true ) ) {
+			$result['message'] = 'Expected "verification_email_failed" in history. Found: ' . implode( ', ', $actions );
+			return $result;
+		}
+
+		$result['pass']    = true;
+		$result['message'] = 'Failed send recorded, expiry clock left unset.';
 		return $result;
 	}
 
