@@ -130,28 +130,41 @@ class GAWG_Settings {
 		return wp_kses_post( $template );
 	}
 
-	/** The verification email as shipped. Placeholders match the help text. */
+	/**
+	 * The verification email as shipped.
+	 *
+	 * Written to be sendable as-is and obvious to edit: short paragraphs, one
+	 * link, no layout tables or inline CSS that the visual editor would fight
+	 * with. The bare link is repeated as text because a fair number of mail
+	 * clients still show the anchor without making it clickable.
+	 */
 	public static function default_verification_template() {
-		return '<p>' . __( 'Hello,', 'gawg' ) . '</p>'
+		return '<p>' . __( 'Hi,', 'gawg' ) . '</p>' . "\n\n"
 			. '<p>' . sprintf(
 				/* translators: %s: giveaway title placeholder, replaced when the mail is sent */
-				__( 'Thank you for entering %s. Please confirm your email address to complete your entry.', 'gawg' ),
+				__( 'Thanks for entering %s. Please confirm your email address to complete your entry.', 'gawg' ),
 				'{giveaway_title}'
-			) . '</p>'
-			. '<p><a href="{verification_link}">' . __( 'Confirm my entry', 'gawg' ) . '</a></p>'
-			. '<p>' . __( 'If you did not enter this giveaway, you can ignore this email.', 'gawg' ) . '</p>';
+			) . '</p>' . "\n\n"
+			. '<p><a href="{verification_link}">' . __( 'Confirm my entry', 'gawg' ) . '</a></p>' . "\n\n"
+			. '<p>' . __( 'If the link above does not work, copy this address into your browser:', 'gawg' ) . '<br />'
+			. '{verification_link}</p>' . "\n\n"
+			. '<p>' . __( 'This link is valid for 24 hours. If you did not enter this giveaway, you can ignore this email.', 'gawg' ) . '</p>';
 	}
 
-	/** The post-verification confirmation email as shipped. */
+	/**
+	 * The post-verification confirmation email as shipped.
+	 *
+	 * {rules_url} is deliberately absent: it is optional per giveaway, and an
+	 * unset one renders as a link to nowhere in every mail sent. The help text
+	 * documents it for admins whose giveaways do set one.
+	 */
 	public static function default_success_template() {
-		return '<p>' . __( 'Hello,', 'gawg' ) . '</p>'
+		return '<p>' . __( 'Hi,', 'gawg' ) . '</p>' . "\n\n"
 			. '<p>' . sprintf(
 				/* translators: %s: giveaway title placeholder, replaced when the mail is sent */
-				__( 'Your entry to %s is confirmed. Good luck!', 'gawg' ),
+				__( 'Your entry to %s is confirmed — good luck!', 'gawg' ),
 				'{giveaway_title}'
-			) . '</p>';
-		// {rules_url} is deliberately absent: it is optional per giveaway, and
-		// an unset one would render as a link to nowhere in every mail sent.
-		// The help text documents it for admins who do set one.
+			) . '</p>' . "\n\n"
+			. '<p>' . __( 'We will be in touch if you win.', 'gawg' ) . '</p>';
 	}
 }
