@@ -797,7 +797,7 @@ flowchart LR
 				printf(
 					/* translators: %s: link to the Settings page */
 					wp_kses(
-						__( 'Go to <a href="%s">GAWG → Settings</a> and scroll to the Email Templates section. Two templates are available:', 'gawg' ),
+						__( 'Both templates ship pre-filled with a working example, so there is nothing you have to configure before running a giveaway. To change them, go to <a href="%s">GAWG → Settings</a> and scroll to the Email Templates section:', 'gawg' ),
 						array( 'a' => array( 'href' => array() ) )
 					),
 					esc_url( admin_url( 'admin.php?page=crb_gawg_settings.php' ) )
@@ -815,7 +815,9 @@ flowchart LR
 				</li>
 			</ul>
 			<p><?php esc_html_e( 'The {rules_url} placeholder is populated from the Rules URL field on each giveaway\'s edit screen (GAWG → Giveaways). Set a Rules URL on the giveaway so participants can be linked directly to the rules page in their success email.', 'gawg' ); ?></p>
-			<p><?php esc_html_e( 'HTML is accepted in both templates. The content is sanitized on display to prevent XSS.', 'gawg' ); ?></p>
+			<p><?php esc_html_e( 'Both fields are the standard WordPress visual editor. What you type is stored unchanged, so hand-written HTML is preserved — use the Text tab to paste markup directly. The content is sanitized before sending to prevent XSS. Media buttons are switched off deliberately: an image in email needs an absolute URL, and a media-library insert usually does not survive the trip.', 'gawg' ); ?></p>
+			<p><?php esc_html_e( 'Clearing a template restores the shipped example rather than disabling the email — a giveaway with no verification email cannot be entered at all.', 'gawg' ); ?></p>
+			<p><?php esc_html_e( 'If an email cannot be sent, it is recorded in the participant history as verification_email_failed or success_email_failed and the reason is written to the plugin log. A failed verification email does not start the 24-hour expiry countdown, so the participant can still be sent a working link once the cause is fixed. There is no automatic retry.', 'gawg' ); ?></p>
 
 			<h2><?php esc_html_e( 'Drawing a Winner', 'gawg' ); ?></h2>
 			<p>

@@ -20,7 +20,7 @@ It could be useful for anyone running small giveaways on a WordPress site withou
   - **Unique visit bonus** — any unique IP address that visits the site via the link increments the inviting participant's entry count by the configured amount (default +1); repeat visits from the same IP are ignored.
   - **Registration bonus** — when a visitor arrives via an invite link a short-lived cookie records the attribution. If that visitor then registers for the same giveaway, the inviter is automatically awarded a configurable bonus (default +1). The bonus is awarded only once per referred registration.
   Entry counts are shown in the Participants admin list and in the "Entries & Invite Links" panel on each participant's edit screen.
-- **Email verification** — when a participant submits the entry form a verification email is sent using an HTML template configured on the Settings page. The email contains a unique link (`?gwag-giveaway=<uuid>&gwag-participant=<uuid>`) that marks the participant as verified when clicked. Verification links expire after 24 hours; an error page with a "Resend verification link" button is shown for expired links. Once verified, a success email (a separate configurable template) is sent. Both templates support placeholders: `{participant_email}`, `{giveaway_title}`, `{verification_link}` (verification template) and `{participant_email}`, `{giveaway_title}`, `{rules_url}` (success template). The `{rules_url}` value is taken from a **Rules URL** field on the giveaway's edit screen.
+- **Email verification** — when a participant submits the entry form a verification email is sent. Both email templates ship pre-filled with a working example and are edited in the WordPress visual editor on the Settings page, so no configuration is needed to run a giveaway. The email contains a unique link (`?gwag-giveaway=<uuid>&gwag-participant=<uuid>`) that marks the participant as verified when clicked. Verification links expire after 24 hours; an error page with a "Resend verification link" button is shown for expired links. Once verified, a success email (a separate configurable template) is sent. Both templates support placeholders: `{participant_email}`, `{giveaway_title}`, `{verification_link}` (verification template) and `{participant_email}`, `{giveaway_title}`, `{rules_url}` (success template). The `{rules_url}` value is taken from a **Rules URL** field on the giveaway's edit screen.
 - **Giveaway status** — each giveaway has a status: **Active** (open for entries), **Closed** (manually closed via the edit screen), or **Winner Drawn** (winner selected). When a giveaway is closed or has a winner, the `[gawg_form]` shortcode and block display a translatable "Sorry, this giveaway is closed" message and AJAX submissions are rejected. Admins toggle the closed flag via a checkbox on the giveaway's edit screen.
 - **Registration date window** — each giveaway optionally stores a **Registration Opens** and **Registration Closes** datetime (in site local time). Before the open date the form is rendered in a disabled state (all inputs and the submit button carry the `disabled` attribute, the wrapper receives the `gawg-form--disabled` CSS class) with a "Registration is not open yet." message shown above it; after the close date the form shows "Registration is closed." and submissions are rejected. Server-side AJAX submissions are rejected in both cases. Both messages are overridable via `not_open_message` / `closed_message` shortcode attributes or the matching text fields in the Gutenberg block's Inspector Controls.
 - **Draw Winner** — a dedicated admin page (**GAWG → Draw Winner**) for running the lottery: select an active giveaway, view a masked participant list (first char + `****` + last char + @domain), configure shuffle count and delay, then click **Shuffle & Pick Winner** to animate through the list and select a random winner server-side. The winner's post ID is saved to the giveaway term and the masked email is displayed. The winner also appears as a read-only field on the giveaway's taxonomy edit screen.
@@ -54,13 +54,20 @@ flowchart TD
     D -- Yes --> R3[Show 'already in the list']
     D -- No --> E[Create gawg_participant post + UUID]
     E --> F[Log 'registered' + record base entry]
-    F --> G[Send verification email + log 'verification_email_sent']
-    G --> H[Participant clicks link]
+    F --> G{Verification email sent?}
+    G -- No --> R4[Log 'verification_email_failed'<br/>expiry clock NOT started]
+    G -- Yes --> G2[Log 'verification_email_sent'<br/>start 24h expiry clock]
+    G2 --> H[Participant clicks link]
     H --> I{Link expired 24h?}
     I -- Yes --> J[Error page + Resend verification button]
     I -- No --> K[Mark verified + log 'verified']
     K --> L[Send success email + log 'success_email_sent']
 ```
+
+The send is drawn as a decision because it is one. The 24-hour expiry clock
+starts only once `wp_mail()` reports success — mail that never left would
+otherwise expire a link the entrant was never given, while looking in the
+admin exactly like one that was delivered.
 
 ### Entries
 
@@ -204,7 +211,7 @@ flowchart LR
 
 ## Usage
 1. Go to **GAWG → Giveaways** and click **Add New Giveaway**. Give the giveaway a name and save it. A unique UUID is automatically assigned and shown in the **Reference UUID** field when you edit the term. Optionally set a **Rules URL** on the giveaway's edit screen — this URL will be included in success emails sent to verified participants.
-2. Configure the email templates at **GAWG → Settings** under the **Email Templates** section. Paste your HTML into the **Verification Email Template** and **Registration Success Email Template** fields and use the provided placeholders (e.g. `{verification_link}`, `{giveaway_title}`).
+2. Optionally adjust the email templates at **GAWG → Settings** under the **Email Templates** section. Both ship pre-filled with a working example, so there is nothing you have to do here before running a giveaway. They are edited in the normal WordPress visual editor — see [Emails](#emails) for the placeholders and what happens when a send fails.
 3. Embed the entry form using the **Giveaway Form** block (search for it in the block inserter) or via the shortcode:
    ```
    [gawg_form uuid="<giveaway-uuid>" rules_url="https://example.com/rules"]
@@ -219,6 +226,59 @@ flowchart LR
 5. The participant clicks the verification link in the email within 24 hours. Their address is confirmed and a success email is sent. If the link has expired, they can request a new one via the resend link shown on the error page.
 6. After a successful submission the participant also receives their personal invite link. Each unique IP that visits via that link awards the inviting participant a configurable bonus (default +1). If that visitor later registers for the same giveaway, the inviter receives an additional configurable bonus (default +1).
 7. Go to **GAWG → Participants** to view all entries and their per-giveaway entry counts, filtered by giveaway if needed.
+
+## Emails
+
+Two emails are sent: a verification mail when someone enters, and a confirmation
+once they have verified. Both templates live at **GAWG → Settings → Email
+Templates**.
+
+### They work out of the box
+
+Both fields ship pre-filled with a working example. Nothing has to be configured
+before running a giveaway.
+
+This has not always been true. Before 1.2.0 the templates were empty by default
+and the mailer returned early when it found an empty one, so an install where
+nobody filled them in sent no verification emails at all and said nothing about
+it — the giveaway went on collecting entries that could never be completed. The
+getters now fall back to the shipped example, so clearing a field restores the
+example rather than disabling entry.
+
+### Editing them
+
+The fields are the standard WordPress visual editor. What you type is stored
+unchanged — no `wpautop`, no reformatting — so hand-written HTML is preserved
+and pasting markup still works via the Text tab.
+
+Media buttons are deliberately off. An image in email needs an absolute URL, and
+a media-library insert usually does not survive the trip.
+
+Placeholders are replaced when the mail is sent:
+
+| Placeholder | Verification | Success | Notes |
+| --- | --- | --- | --- |
+| `{participant_email}` | yes | yes | The address that entered. |
+| `{giveaway_title}` | yes | yes | Name of the giveaway term. |
+| `{verification_link}` | yes | — | The confirmation URL. Safe to put in a link's URL field: WordPress runs TinyMCE with `convert_urls` off, so the editor leaves it alone. |
+| `{rules_url}` | — | yes | **Empty unless the giveaway has a Rules URL set.** Left out of the shipped template for that reason — an unset one renders as a link to nowhere. |
+
+Templates pass through `wp_kses_post()` before sending, so `<script>` and other
+disallowed markup is stripped.
+
+### When a send fails
+
+`wp_mail()` returning false, or a template that survives sanitising as nothing,
+is recorded rather than discarded:
+
+- history gets `verification_email_failed` / `success_email_failed`
+- the reason goes to the plugin log at **GAWG → Logs**
+- the 24-hour expiry clock is **not** started, so the entrant is not left
+  holding a link that expires without ever having arrived
+
+A participant with `verification_email_failed` in their history has not been
+able to verify and needs a resend once the cause is fixed. There is no automatic
+retry — a failing mail configuration would just fail again.
 
 ## Current State
 
@@ -278,6 +338,18 @@ The `GAWG_Participant::get_giveaways_for_email( $email )` static method exposes 
 The `GAWG_Participant::get_action_logs( $giveaway_uuid, $email = '' )` static method aggregates the per-participant action history across a whole giveaway. It resolves the giveaway by its reference UUID, reads each linked participant's `history_N` entries, and returns a flat array of records (`datetime`, `action`, `participant_email`, `participant_uuid`) sorted newest-first. Passing only the UUID includes every participant; passing an email restricts the result to that single participant. It returns an empty array for unknown giveaways or unmatched emails and performs no ownership check. This function backs the read-only **Action Log** tables on the giveaway edit screen and the Draw Winner page.
 
 ## Changelog
+
+### 1.2.0
+- Fixed the verification email failing silently. The mailer returned early when no template was configured, and no template shipped by default — so an install where nobody filled the field in sent nothing and reported nothing, while continuing to collect entries that could never be completed.
+- Both email templates now ship pre-filled with a working example, and the getters fall back to it, so clearing a field restores the example rather than disabling entry.
+- The templates are edited in the WordPress visual editor instead of a raw HTML textarea. Stored content is unchanged by the editor, so existing hand-written HTML is preserved.
+- Fixed the verification link's 24-hour expiry clock being started before the send was attempted. Mail that never left previously expired a link the entrant was never given, while looking identical in the admin to one that was delivered. The timestamp is now written only after `wp_mail()` succeeds.
+- A failed or impossible send is recorded as `verification_email_failed` / `success_email_failed` in participant history and logged with its reason.
+- Added a self-test covering the failed-send path; the existing timestamp test only ever exercised the success path, which is how the above went unnoticed.
+
+### 1.1.0
+- Added general plugin logging at **GAWG → Logs**, alongside the existing per-participant history. The two are complementary: history answers "what happened to this entrant", logs answer "what did the plugin do".
+- Stopped recording failed emails as sent. `wp_mail()` returning false was previously discarded.
 
 ### 1.0.0
 - First stable release.
