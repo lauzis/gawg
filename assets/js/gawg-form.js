@@ -1,0 +1,116 @@
+(function () {
+	'use strict';
+
+	function initForm( wrap ) {
+		var form    = wrap.querySelector( '.gawg-form' );
+		var success = wrap.querySelector( '.gawg-form-success' );
+		var message = wrap.querySelector( '.gawg-form-message' );
+
+		if ( ! form ) {
+			return;
+		}
+
+		form.addEventListener( 'submit', function ( e ) {
+			e.preventDefault();
+
+			var emailEl    = form.querySelector( '[name="gawg_email"]' );
+			var rulesEl    = form.querySelector( '[name="gawg_rules"]' );
+			var uuidEl     = form.querySelector( '[name="gawg_uuid"]' );
+			var nonceEl    = form.querySelector( '[name="_gawg_nonce"]' );
+			var honeypotEl = form.querySelector( '[name="gawg_hp"]' );
+			var btn        = form.querySelector( '[type="submit"]' );
+
+			clearMessage( message );
+
+			if ( ! emailEl || '' === emailEl.value.trim() ) {
+				showMessage( message, gawgFormConfig.i18n.invalidEmail, 'error' );
+				return;
+			}
+
+			if ( rulesEl && ! rulesEl.checked ) {
+				showMessage( message, gawgFormConfig.i18n.acceptRules, 'error' );
+				return;
+			}
+
+			if ( gawgFormConfig.recaptchaEnabled ) {
+				var recaptchaEl = form.querySelector( '.g-recaptcha-response' );
+				if ( ! recaptchaEl || ! recaptchaEl.value ) {
+					showMessage( message, gawgFormConfig.i18n.solveRecaptcha, 'error' );
+					return;
+				}
+			}
+
+			var data = new FormData();
+			data.append( 'action',      gawgFormConfig.action );
+			data.append( '_gawg_nonce', nonceEl    ? nonceEl.value    : '' );
+			data.append( 'gawg_uuid',   uuidEl     ? uuidEl.value     : '' );
+			data.append( 'gawg_email',  emailEl.value.trim() );
+			data.append( 'gawg_hp',     honeypotEl ? honeypotEl.value : '' );
+
+			if ( gawgFormConfig.recaptchaEnabled ) {
+				var recaptchaResponse = form.querySelector( '.g-recaptcha-response' );
+				if ( recaptchaResponse ) {
+					data.append( 'g-recaptcha-response', recaptchaResponse.value );
+				}
+			}
+
+			btn.disabled = true;
+
+			fetch( gawgFormConfig.ajaxUrl, { method: 'POST', body: data } )
+				.then( function ( r ) { return r.json(); } )
+				.then( function ( response ) {
+					if ( response.success ) {
+						form.style.display    = 'none';
+						success.style.display = '';
+						if ( response.data && response.data.invite_url ) {
+							var shareWrap  = document.createElement( 'div' );
+							shareWrap.className = 'gawg-invite-wrap';
+							var inviteInput = document.createElement( 'input' );
+							inviteInput.type     = 'text';
+							inviteInput.readOnly = true;
+							inviteInput.value    = response.data.invite_url;
+							inviteInput.style    = 'width:100%;font-family:monospace;';
+							inviteInput.addEventListener( 'click', function () { inviteInput.select(); } );
+							var heading = document.createElement( 'p' );
+							heading.innerHTML = '<strong>' + gawgFormConfig.i18n.inviteHeading + '</strong>';
+							var desc = document.createElement( 'p' );
+							desc.className   = 'description';
+							desc.textContent = gawgFormConfig.i18n.inviteDesc;
+							shareWrap.appendChild( heading );
+							shareWrap.appendChild( inviteInput );
+							shareWrap.appendChild( desc );
+							success.appendChild( shareWrap );
+						}
+					} else {
+						var msg = response.data && response.data.message
+							? response.data.message
+							: gawgFormConfig.i18n.networkError;
+						showMessage( message, msg, 'error' );
+						if ( gawgFormConfig.recaptchaEnabled && window.grecaptcha ) {
+							window.grecaptcha.reset();
+						}
+						btn.disabled = false;
+					}
+				} )
+				.catch( function () {
+					showMessage( message, gawgFormConfig.i18n.networkError, 'error' );
+					if ( gawgFormConfig.recaptchaEnabled && window.grecaptcha ) {
+						window.grecaptcha.reset();
+					}
+					btn.disabled = false;
+				} );
+		} );
+	}
+
+	function showMessage( el, text, type ) {
+		el.textContent = text;
+		el.className   = 'gawg-form-message gawg-form-message--' + type;
+	}
+
+	function clearMessage( el ) {
+		el.textContent = '';
+		el.className   = 'gawg-form-message';
+	}
+
+	document.querySelectorAll( '.gawg-form-wrap' ).forEach( initForm );
+} )();

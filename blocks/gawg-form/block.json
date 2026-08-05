@@ -1,0 +1,34 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "gawg/form",
+	"version": "1.0.0",
+	"title": "Giveaway Form",
+	"category": "widgets",
+	"icon": "awards",
+	"description": "Embeds the giveaway entry form for a selected giveaway campaign.",
+	"textdomain": "gawg",
+	"editorScript": "gawg-form-block-editor",
+	"attributes": {
+		"giveaway_uuid": {
+			"type": "string",
+			"default": ""
+		},
+		"rules_url": {
+			"type": "string",
+			"default": ""
+		},
+		"rules_post_id": {
+			"type": "integer",
+			"default": 0
+		},
+		"notOpenMessage": {
+			"type": "string",
+			"default": ""
+		},
+		"closedMessage": {
+			"type": "string",
+			"default": ""
+		}
+	}
+}
