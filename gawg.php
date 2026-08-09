@@ -50,3 +50,20 @@ register_deactivation_hook( __FILE__, 'gawg_deactivate' );
 function gawg_activate() {}
 
 function gawg_deactivate() {}
+
+// The plugin's version in the admin footer, beside WordPress's own — the first
+// thing worth knowing about a page misbehaving is which version drew it.
+add_action( 'admin_init', static function () {
+    if ( ! class_exists( '\\Lauzis\\WpPackages\\Admin\\Footer' ) ) {
+        return;
+    }
+
+    \Lauzis\WpPackages\Admin\Footer::show(
+        'gawg',
+        array(
+            'name'    => 'GAWG',
+            'version' => defined( 'GAWG_VERSION' ) ? GAWG_VERSION : '',
+        'types'   => array( 'gawg_participant' ),
+        )
+    );
+} );
