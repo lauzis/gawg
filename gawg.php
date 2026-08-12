@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GAWG — GiveAway Winner Generator
  * Description: Create giveaways, collect applicant entries, and run a lottery to pick winners.
- * Version:     1.3.0
+ * Version:     1.2.2
  * Author:      Aivars Lauzis
  * License:     GPL-2.0+
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'GAWG_VERSION',    '1.3.0' );
+define( 'GAWG_VERSION',    '1.2.2' );
 define( 'GAWG_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GAWG_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -53,8 +53,6 @@ require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-block.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-verification.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg-extra-entries.php';
 require_once GAWG_PLUGIN_DIR . 'includes/class-gawg.php';
-
-add_action( 'admin_post_gawg_clear_logs', array( 'GAWG_Logs', 'handle_clear' ) );
 
 add_action( 'after_setup_theme', array( 'Carbon_Fields\\Carbon_Fields', 'boot' ) );
 add_action( 'plugins_loaded', array( 'GAWG', 'init' ) );
