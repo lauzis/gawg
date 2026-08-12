@@ -7,11 +7,12 @@
  * Never loaded at runtime.
  *
  * Regenerate with:
- *   bin/schema-i18n --domain=gawg --out=languages/schema-strings.php config/settings.json
+ *   bin/schema-i18n --domain=gawg --out=languages/schema-strings.php config/settings.json config/logs.json
  */
 
 return;
 
+__( '@callback:gawg_logs_view', 'gawg' );
 __( 'Email Templates', 'gawg' );
 __( 'Entries awarded to an inviter when a unique visitor clicks their invite link. Default: 1.', 'gawg' );
 __( 'Entries awarded to an inviter when a visitor they referred completes registration. Default: 1.', 'gawg' );

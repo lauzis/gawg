@@ -69,6 +69,19 @@ class GAWG_Settings {
 			)
 		);
 
+		// The log itself, added to the section the package just declared so the
+		// switch and what it writes share a tab. Whether it appears at all is
+		// this plugin's decision, which is why it is registered here.
+		$page->callback( 'gawg_logs_view', array( 'GAWG_Logs', 'panel' ) );
+
+		$page->register(
+			GAWG_PLUGIN_DIR . 'config/logs.json',
+			array(
+				'prefix' => self::PREFIX,
+				'domain' => 'gawg',
+			)
+		);
+
 		$page->render();
 	}
 
