@@ -23,7 +23,20 @@ if ( ! defined( 'GAWG_LOG_PATH' ) ) {
 	unset( $gawg_uploads );
 }
 
-require_once GAWG_PLUGIN_DIR . 'vendor/autoload.php';
+$gawg_autoload = GAWG_PLUGIN_DIR . 'vendor/autoload.php';
+
+// vendor/ is no longer committed, so a checkout without a composer install has
+// no autoloader — and requiring one that is not there takes the whole site
+// down rather than this plugin.
+if ( ! file_exists( $gawg_autoload ) ) {
+	add_action( 'admin_notices', static function () {
+		echo '<div class="notice notice-error"><p><strong>GAWG:</strong> run <code>composer install</code> in the plugin directory.</p></div>';
+	} );
+
+	return;
+}
+
+require_once $gawg_autoload;
 // Required explicitly: Composer's files autoload runs only one copy of this
 // package per request, so the version gate would never see the others.
 require_once GAWG_PLUGIN_DIR . 'vendor/lauzis/wp-plugin-packages/bootstrap.php';
