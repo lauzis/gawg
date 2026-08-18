@@ -339,6 +339,11 @@ The `GAWG_Participant::get_action_logs( $giveaway_uuid, $email = '' )` static me
 
 ## Changelog
 
+### 1.3.0
+- Log entries can now be sent to **Slack**. Two fields on the Logging settings: a webhook URL, and whether Slack gets errors only (the default) or every entry. Errors are posted even with file logging off — a log file only answers questions once somebody thinks to open it, and by then the interesting entry is usually days old.
+- Sending is fire-and-forget, so a log call never makes the page wait on Slack. The trade-off is that a webhook Slack rejects fails quietly; only `https://` URLs are used, since the webhook URL is itself a credential and anyone holding it can post to the channel.
+- "Every log entry" means one request per entry and Slack allows roughly one message a second per webhook, so it suits a quiet site or a specific investigation rather than everyday use.
+
 ### 1.2.0
 - Fixed the verification email failing silently. The mailer returned early when no template was configured, and no template shipped by default — so an install where nobody filled the field in sent nothing and reported nothing, while continuing to collect entries that could never be completed.
 - Both email templates now ship pre-filled with a working example, and the getters fall back to it, so clearing a field restores the example rather than disabling entry.
