@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GAWG — GiveAway Winner Generator
  * Description: Create giveaways, collect applicant entries, and run a lottery to pick winners.
- * Version:     1.2.2
+ * Version:     1.3.0
  * Author:      Aivars Lauzis
  * License:     GPL-2.0+
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'GAWG_VERSION',    '1.2.2' );
+define( 'GAWG_VERSION',    '1.3.0' );
 define( 'GAWG_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GAWG_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -23,7 +23,20 @@ if ( ! defined( 'GAWG_LOG_PATH' ) ) {
 	unset( $gawg_uploads );
 }
 
-require_once GAWG_PLUGIN_DIR . 'vendor/autoload.php';
+$gawg_autoload = GAWG_PLUGIN_DIR . 'vendor/autoload.php';
+
+// vendor/ is no longer committed, so a checkout without a composer install has
+// no autoloader — and requiring one that is not there takes the whole site
+// down rather than this plugin.
+if ( ! file_exists( $gawg_autoload ) ) {
+	add_action( 'admin_notices', static function () {
+		echo '<div class="notice notice-error"><p><strong>GAWG:</strong> run <code>composer install</code> in the plugin directory.</p></div>';
+	} );
+
+	return;
+}
+
+require_once $gawg_autoload;
 // Required explicitly: Composer's files autoload runs only one copy of this
 // package per request, so the version gate would never see the others.
 require_once GAWG_PLUGIN_DIR . 'vendor/lauzis/wp-plugin-packages/bootstrap.php';
