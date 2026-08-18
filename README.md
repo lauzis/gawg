@@ -339,6 +339,9 @@ The `GAWG_Participant::get_action_logs( $giveaway_uuid, $email = '' )` static me
 
 ## Changelog
 
+### 1.3.1
+- Added a **Send a test message** button beside the Slack webhook field. It posts to whatever is in the field, saved or not, waits for Slack's answer and reports it — log traffic is fire-and-forget, so a webhook Slack rejects otherwise fails silently.
+
 ### 1.3.0
 - Log entries can now be sent to **Slack**. Two fields on the Logging settings: a webhook URL, and whether Slack gets errors only (the default) or every entry. Errors are posted even with file logging off — a log file only answers questions once somebody thinks to open it, and by then the interesting entry is usually days old.
 - Sending is fire-and-forget, so a log call never makes the page wait on Slack. The trade-off is that a webhook Slack rejects fails quietly; only `https://` URLs are used, since the webhook URL is itself a credential and anyone holding it can post to the channel.

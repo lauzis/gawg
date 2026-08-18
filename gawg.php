@@ -2,7 +2,7 @@
 /**
  * Plugin Name: GAWG — GiveAway Winner Generator
  * Description: Create giveaways, collect applicant entries, and run a lottery to pick winners.
- * Version:     1.3.0
+ * Version:     1.3.1
  * Author:      Aivars Lauzis
  * License:     GPL-2.0+
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -11,7 +11,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'GAWG_VERSION',    '1.3.0' );
+define( 'GAWG_VERSION',    '1.3.1' );
 define( 'GAWG_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'GAWG_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
