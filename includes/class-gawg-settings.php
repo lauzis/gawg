@@ -16,6 +16,21 @@ class GAWG_Settings {
 
 	public static function init() {
 		add_action( 'carbon_fields_register_fields', array( __CLASS__, 'register_fields' ) );
+
+		// The test button answers over admin-ajax, which never renders the
+		// settings page, so its endpoint is registered on every admin request.
+		if ( is_admin() ) {
+			add_action(
+				'admin_init',
+				static function () {
+					$tester = GAWG_Logs::slack_tester();
+
+					if ( $tester ) {
+						$tester->boot();
+					}
+				}
+			);
+		}
 	}
 
 	/**
@@ -60,6 +75,15 @@ class GAWG_Settings {
 				),
 			)
 		);
+
+		// Draws the "Send a test message" button under the Slack webhook field.
+		// Without the callback the schema's html field renders nothing, so an
+		// older bundled package simply has no button.
+		$tester = GAWG_Logs::slack_tester();
+
+		if ( $tester ) {
+			$page->callback( 'logs_slack_test', array( $tester, 'render' ) );
+		}
 
 		$page->register(
 			WpPackages_Registry::schema( 'logs' ),
